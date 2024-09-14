@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface ChatMessageRepository extends MongoRepository<ChatMessage, String> {
-    List<ChatMessage> findBySenderAndReceiver(String sender, String receiver);
+    List<ChatMessage> findByTenantIdAndCustomerIdOrderByTimestampAsc(String tenantId, String customerId);
 }

@@ -11,6 +11,9 @@ public class UserHandshakeHandler extends DefaultHandshakeHandler {
     protected Principal determineUser(ServerHttpRequest request,
                                       WebSocketHandler wsHandler,
                                       Map<String, Object> attributes) {
+
+
+
         // Extract username from query parameters
         String query = request.getURI().getQuery();
         String username = null;
@@ -23,7 +26,7 @@ public class UserHandshakeHandler extends DefaultHandshakeHandler {
         }
 
         if (username == null) {
-            username = "anonymous";
+            username = "anonymous:anonymous";
         }
 
         String finalUsername = username;

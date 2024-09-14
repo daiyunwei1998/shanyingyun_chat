@@ -12,6 +12,7 @@ import org.springframework.stereotype.Controller;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Controller
@@ -27,45 +28,42 @@ public class ChatController {
 
     @MessageMapping("/chat.addUser")
     public void addUser(ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
-        String sender = principal.getName();
-        chatMessage.setSender(sender);
+        String tenantId = chatMessage.getTenantId();
+        String userId = chatMessage.getSender();
+        String userType = chatMessage.getUserType();
 
-        // Extract tenantId
-        //String tenantId = getTenantIdFromPrincipal(principal);
-        String tenantId = "temp line35 change this";
-        if (tenantId == null) {
+        if (tenantId == null || userId == null || userType == null) {
             // Handle error
+            log.error("Missing user information in chat message");
             return;
         }
-        chatMessage.setTenantId(tenantId);
 
-        // Retrieve the session ID from the header accessor
-        String sessionId = headerAccessor.getSessionId();
-        chatMessage.setSessionId(sessionId);
-
-        // Determine user type
-        String userType = sender.contains("customer") ? "customer" : "agent";
+        chatMessage.setSessionId(headerAccessor.getSessionId());
 
         // Create and save SessionInfo
         SessionInfo sessionInfo = new SessionInfo();
-        sessionInfo.setSessionId(sessionId);
-        sessionInfo.setUserId(sender);
+        sessionInfo.setSessionId(chatMessage.getSessionId());
+        sessionInfo.setUserId(userId);
         sessionInfo.setUserType(userType);
         sessionInfo.setTenantId(tenantId);
 
-        // Save session info
+        // Save session info and mappings
         chatService.saveSessionInfo(sessionInfo);
+        chatService.saveUserSessionMapping(tenantId, userId, chatMessage.getSessionId());
+        chatService.saveSessionTenantMapping(chatMessage.getSessionId(), tenantId);
 
-        // Map userId to sessionId
-        chatService.saveUserSessionMapping(tenantId, sender, sessionId);
-
-        // Save session-tenant mapping
-        chatService.saveSessionTenantMapping(sessionId, tenantId);
-
-        log.info("User {} of type {} has joined with session ID {} under tenant {}", sender, userType, sessionId, tenantId);
+        log.info("User {} of type {} has joined with session ID {} under tenant {}", userId, userType, chatMessage.getSessionId(), tenantId);
 
         chatMessage.setTimestamp(Instant.now());
         chatMessage.setType(ChatMessage.MessageType.JOIN);
+
+
+
+        if (tenantId == null || userId == null || userType == null) {
+            // Handle error
+            log.error("Missing user information in session attributes");
+            return;
+        }
 
         if ("customer".equals(userType)) {
             // Assign agent
@@ -74,7 +72,7 @@ public class ChatController {
                 log.warn("No available agents for tenant {}", tenantId);
                 // Notify customer about unavailability
                 chatMessage.setContent("No agents are currently available. Please wait.");
-                messagingTemplate.convertAndSendToUser(sender, "/queue/messages", chatMessage);
+                messagingTemplate.convertAndSendToUser(userId, "/queue/messages", chatMessage);
                 return;
             }
 
@@ -82,36 +80,35 @@ public class ChatController {
             chatService.saveSessionInfo(sessionInfo);
 
             // Update agent's session info
-            chatService.assignCustomerToAgent(tenantId, agentId, sender);
+            chatService.assignCustomerToAgent(tenantId, agentId, userId);
 
             chatMessage.setReceiver(agentId);
 
             // Notify agent and customer
             messagingTemplate.convertAndSendToUser(agentId, "/queue/messages", chatMessage);
-            messagingTemplate.convertAndSendToUser(sender, "/queue/messages", chatMessage);
+            messagingTemplate.convertAndSendToUser(userId, "/queue/messages", chatMessage);
         } else if ("agent".equals(userType)) {
-            log.info("Agent {} is now available under tenant {}", sender, tenantId);
+            log.info("Agent {} is now available under tenant {}", userId, tenantId);
             // Add agent to available list
-            chatService.addAgentToAvailableList(tenantId, sender);
+            chatService.addAgentToAvailableList(tenantId, userId);
         }
     }
 
     @MessageMapping("/chat.sendMessage")
     public void sendMessage(ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
-        String sender = principal.getName();
-        chatMessage.setSender(sender);
-        chatMessage.setTimestamp(Instant.now());
+        String tenantId = chatMessage.getTenantId();
+        String userId = chatMessage.getSender();
+        String userType = chatMessage.getUserType();
 
-        // Extract tenantId
-        String tenantId = getTenantIdFromPrincipal(principal);
-        if (tenantId == null) {
+        if (tenantId == null || userId == null || userType == null) {
             // Handle error
+            log.error("Missing user information in chat message");
             return;
         }
-        chatMessage.setTenantId(tenantId);
 
         String sessionId = headerAccessor.getSessionId();
         chatMessage.setSessionId(sessionId);
+        chatMessage.setTimestamp(Instant.now());
 
         // Retrieve session info
         SessionInfo sessionInfo = chatService.getSessionInfo(tenantId, sessionId);
@@ -126,17 +123,17 @@ public class ChatController {
             chatMessage.setSource(ChatMessage.SourceType.USER);
             receiver = sessionInfo.getAssignedTo(); // Assigned agent
             if (receiver == null) {
-                log.warn("Customer {} is not assigned to any agent under tenant {}", sender, tenantId);
+                log.warn("Customer {} is not assigned to any agent under tenant {}", userId, tenantId);
                 return;
             }
             chatMessage.setReceiver(receiver);
-            chatMessage.setCustomerId(sender);
+            chatMessage.setCustomerId(userId);
         } else if ("agent".equals(sessionInfo.getUserType())) {
             chatMessage.setSource(ChatMessage.SourceType.AGENT);
             // Get the customers assigned to this agent
-            List<String> assignedCustomers = chatService.getAssignedCustomers(tenantId, sender);
+            List<String> assignedCustomers = chatService.getAssignedCustomers(tenantId, userId);
             if (assignedCustomers.isEmpty()) {
-                log.warn("Agent {} is not assigned to any customers under tenant {}", sender, tenantId);
+                log.warn("Agent {} is not assigned to any customers under tenant {}", userId, tenantId);
                 return;
             }
             // For simplicity, send the message to all assigned customers
@@ -174,4 +171,7 @@ public class ChatController {
             return null;
         }
     }
+
+
+
 }

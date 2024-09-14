@@ -14,6 +14,7 @@ public class ChatMessage implements Serializable {
     private String tenantId;
     private Instant timestamp;
     private SourceType source;
+    private String userType;
     private String customerId; // For easy reference
 
     public ChatMessage() {

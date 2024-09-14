@@ -3,6 +3,11 @@ package org.service.customer.service;
 import lombok.extern.slf4j.Slf4j;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
+import org.service.customer.repository.ChatMessageRepository;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +21,13 @@ public class ChatService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final Map<String, Queue<String>> tenantAgentQueueMap = new HashMap<>();
+    private final ChatMessageRepository chatMessageRepository;
+    private final MongoTemplate mongoTemplate;
 
-    public ChatService(RedisTemplate<String, Object> redisTemplate) {
+    public ChatService(RedisTemplate<String, Object> redisTemplate, ChatMessageRepository chatMessageRepository, MongoTemplate mongoTemplate) {
         this.redisTemplate = redisTemplate;
+        this.chatMessageRepository = chatMessageRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     // Save session information to Redis
@@ -111,9 +120,9 @@ public class ChatService {
         log.info("Saved message to Redis under key: {}", key);
     }
 
-    // Placeholder for saving message to MongoDB
     private void saveMessageToMongo(ChatMessage chatMessage) {
-        // Implement saving to MongoDB
+        String collectionName = "chat_messages_" + chatMessage.getTenantId();
+        mongoTemplate.save(chatMessage, collectionName);
     }
 
     // Get messages for a customer
@@ -127,6 +136,33 @@ public class ChatService {
         }
         return Collections.emptyList();
     }
+
+    public List<ChatMessage> getChatHistory(String tenantId, String customerId) {
+        String collectionName = "chat_messages_" + tenantId;
+        Query query = new Query();
+        query.addCriteria(Criteria.where("customerId").is(customerId));
+        query.with(Sort.by(Sort.Direction.ASC, "timestamp"));
+        return mongoTemplate.find(query, ChatMessage.class, collectionName);
+    }
+
+    public List<ChatMessage> getChatHistory(String tenantId, String customerId, int page, int size) {
+        String collectionName = "chat_messages_" + tenantId;
+        Query query = new Query();
+        query.addCriteria(Criteria.where("customerId").is(customerId));
+        query.with(Sort.by(Sort.Direction.ASC, "timestamp"));
+        query.skip(page * size);
+        query.limit(size);
+        return mongoTemplate.find(query, ChatMessage.class, collectionName);
+    }
+
+    public long countChatMessages(String tenantId, String customerId) {
+        String collectionName = "chat_messages_" + tenantId;
+        Query query = new Query();
+        query.addCriteria(Criteria.where("customerId").is(customerId));
+        return mongoTemplate.count(query, collectionName);
+    }
+
+
 
     // Agent availability management
     public void addAgentToAvailableList(String tenantId, String agentId) {
