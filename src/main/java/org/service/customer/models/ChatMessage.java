@@ -15,7 +15,7 @@ public class ChatMessage implements Serializable {
     private Instant timestamp;
     private SourceType source;
     private String userType;
-    private String customerId; // For easy reference
+    private String customerId;
 
     public ChatMessage() {
         this.timestamp = Instant.now();
