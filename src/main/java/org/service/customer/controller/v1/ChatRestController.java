@@ -16,19 +16,5 @@ public class ChatRestController {
         this.chatService = chatService;
     }
 
-    @GetMapping("/{tenantId}/{customerId}")
-    public List<ChatMessage> getChatHistory(@PathVariable String tenantId, @PathVariable String customerId) {
-        return chatService.getChatHistory(tenantId, customerId);
-    }
-
-
-   /* @GetMapping("/{tenantId}/{customerId}")
-    public List<ChatMessage> getChatHistoryWithPaging(
-            @PathVariable String tenantId,
-            @PathVariable String customerId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
-        return chatService.getChatHistory(tenantId, customerId, page, size);
-    }*/
 
 }

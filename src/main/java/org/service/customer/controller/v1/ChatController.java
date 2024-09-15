@@ -4,6 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.service.ChatService;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -20,10 +25,14 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatService chatService;
+    private final RabbitAdmin rabbitAdmin;
+    private final TopicExchange topicExchange;
 
-    public ChatController(SimpMessagingTemplate messagingTemplate, ChatService chatService) {
+    public ChatController(SimpMessagingTemplate messagingTemplate, ChatService chatService, RabbitAdmin rabbitAdmin, TopicExchange topicExchange) {
         this.messagingTemplate = messagingTemplate;
         this.chatService = chatService;
+        this.rabbitAdmin = rabbitAdmin;
+        this.topicExchange = topicExchange;
     }
 
     @MessageMapping("/chat.addUser")
@@ -33,7 +42,6 @@ public class ChatController {
         String userType = chatMessage.getUserType();
 
         if (tenantId == null || userId == null || userType == null) {
-            // Handle error
             log.error("Missing user information in chat message");
             return;
         }
@@ -47,7 +55,6 @@ public class ChatController {
         sessionInfo.setUserType(userType);
         sessionInfo.setTenantId(tenantId);
 
-        // Save session info and mappings
         chatService.saveSessionInfo(sessionInfo);
         chatService.saveUserSessionMapping(tenantId, userId, chatMessage.getSessionId());
         chatService.saveSessionTenantMapping(chatMessage.getSessionId(), tenantId);
@@ -57,41 +64,44 @@ public class ChatController {
         chatMessage.setTimestamp(Instant.now());
         chatMessage.setType(ChatMessage.MessageType.JOIN);
 
+        // Dynamically create and bind the queue for this tenant
+        createAndBindTenantQueue(tenantId);
 
-
-        if (tenantId == null || userId == null || userType == null) {
-            // Handle error
-            log.error("Missing user information in session attributes");
-            return;
-        }
-
-        if ("customer".equals(userType)) {
-            // Assign agent
-            String agentId = chatService.findAvailableAgent(tenantId);
-            if (agentId == null) {
-                log.warn("No available agents for tenant {}", tenantId);
-                // Notify customer about unavailability
-                chatMessage.setContent("No agents are currently available. Please wait.");
-                messagingTemplate.convertAndSendToUser(userId, "/queue/messages", chatMessage);
-                return;
-            }
-
-            sessionInfo.setAssignedTo(agentId);
-            chatService.saveSessionInfo(sessionInfo);
-
-            // Update agent's session info
-            chatService.assignCustomerToAgent(tenantId, agentId, userId);
-
-            chatMessage.setReceiver(agentId);
-
-            // Notify agent and customer
-            messagingTemplate.convertAndSendToUser(agentId, "/queue/messages", chatMessage);
-            messagingTemplate.convertAndSendToUser(userId, "/queue/messages", chatMessage);
-        } else if ("agent".equals(userType)) {
+        if ("agent".equals(userType)) {
             log.info("Agent {} is now available under tenant {}", userId, tenantId);
-            // Add agent to available list
             chatService.addAgentToAvailableList(tenantId, userId);
         }
+
+        // Send a notification to all agents that a customer has joined
+        if ("customer".equals(userType)) {
+            messagingTemplate.convertAndSend("/topic/" + tenantId + ".new_customer", chatMessage);
+            log.info("Message sent to: /topic/" + tenantId + ".new_customer");
+        }
+    }
+
+    private void createAndBindTenantQueue(String tenantId) {
+        String stompExchange = "amq.topic"; // Default STOMP broker relay exchange
+
+        // Create tenant-specific queues
+        Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
+        Queue customerMessageQueue = new Queue(tenantId + ".customer_message", true);
+        rabbitAdmin.declareQueue(newCustomerQueue);
+        rabbitAdmin.declareQueue(customerMessageQueue);
+
+        // Bind queues to the 'amq.topic' exchange with appropriate routing keys
+        Binding newCustomerBinding = BindingBuilder.bind(newCustomerQueue)
+                .to(new TopicExchange(stompExchange))
+                .with(tenantId + ".new_customer");
+        rabbitAdmin.declareBinding(newCustomerBinding);
+
+        Binding customerMessageBinding = BindingBuilder.bind(customerMessageQueue)
+                .to(new TopicExchange(stompExchange))
+                .with(tenantId + ".customer_message");
+        rabbitAdmin.declareBinding(customerMessageBinding);
+
+        log.info("Queues {} and {} bound to exchange {} with routing keys {} and {}",
+                newCustomerQueue.getName(), customerMessageQueue.getName(),
+                stompExchange, tenantId + ".new_customer", tenantId + ".customer_message");
     }
 
     @MessageMapping("/chat.sendMessage")
@@ -101,7 +111,6 @@ public class ChatController {
         String userType = chatMessage.getUserType();
 
         if (tenantId == null || userId == null || userType == null) {
-            // Handle error
             log.error("Missing user information in chat message");
             return;
         }
@@ -110,54 +119,27 @@ public class ChatController {
         chatMessage.setSessionId(sessionId);
         chatMessage.setTimestamp(Instant.now());
 
-        // Retrieve session info
         SessionInfo sessionInfo = chatService.getSessionInfo(tenantId, sessionId);
         if (sessionInfo == null) {
             log.warn("No session info found for session ID {} under tenant {}", sessionId, tenantId);
             return;
         }
 
-        String receiver;
-
         if ("customer".equals(sessionInfo.getUserType())) {
             chatMessage.setSource(ChatMessage.SourceType.USER);
-            receiver = sessionInfo.getAssignedTo(); // Assigned agent
-            if (receiver == null) {
-                log.warn("Customer {} is not assigned to any agent under tenant {}", userId, tenantId);
-                return;
-            }
-            chatMessage.setReceiver(receiver);
-            chatMessage.setCustomerId(userId);
+
+            // Broadcast the message to all available agents
+            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_message", chatMessage);
+
         } else if ("agent".equals(sessionInfo.getUserType())) {
             chatMessage.setSource(ChatMessage.SourceType.AGENT);
-            // Get the customers assigned to this agent
-            List<String> assignedCustomers = chatService.getAssignedCustomers(tenantId, userId);
-            if (assignedCustomers.isEmpty()) {
-                log.warn("Agent {} is not assigned to any customers under tenant {}", userId, tenantId);
-                return;
-            }
-            // For simplicity, send the message to all assigned customers
-            for (String customerId : assignedCustomers) {
-                chatMessage.setReceiver(customerId);
-                chatMessage.setCustomerId(customerId);
 
-                // Save the message
-                chatService.saveMessage(chatMessage);
-
-                // Send the message to the customer
-                messagingTemplate.convertAndSendToUser(customerId, "/queue/messages", chatMessage);
-            }
-            return;
-        } else {
-            log.error("Unknown user type: {}", sessionInfo.getUserType());
-            return;
+            // Send the agent's reply directly to the customer
+            messagingTemplate.convertAndSendToUser(chatMessage.getReceiver(), "/queue/messages", chatMessage);
         }
 
         // Save the message
         chatService.saveMessage(chatMessage);
-
-        // Send the message to the receiver
-        messagingTemplate.convertAndSendToUser(receiver, "/queue/messages", chatMessage);
     }
 
     // Utility method to extract tenantId from Principal

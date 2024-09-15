@@ -4,10 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.repository.ChatMessageRepository;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -21,12 +18,10 @@ public class ChatService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final Map<String, Queue<String>> tenantAgentQueueMap = new HashMap<>();
-    private final ChatMessageRepository chatMessageRepository;
     private final MongoTemplate mongoTemplate;
 
-    public ChatService(RedisTemplate<String, Object> redisTemplate, ChatMessageRepository chatMessageRepository, MongoTemplate mongoTemplate) {
+    public ChatService(RedisTemplate<String, Object> redisTemplate, MongoTemplate mongoTemplate) {
         this.redisTemplate = redisTemplate;
-        this.chatMessageRepository = chatMessageRepository;
         this.mongoTemplate = mongoTemplate;
     }
 
@@ -43,71 +38,7 @@ public class ChatService {
         return (SessionInfo) redisTemplate.opsForValue().get(key);
     }
 
-    // Delete session information from Redis
-    public void deleteSessionInfo(String tenantId, String sessionId) {
-        String key = "tenant:" + tenantId + ":session:" + sessionId;
-        redisTemplate.delete(key);
-        log.info("Deleted session info for session ID {} under tenant {}", sessionId, tenantId);
-    }
-
-    // Map userId to sessionId for quick lookup
-    public void saveUserSessionMapping(String tenantId, String userId, String sessionId) {
-        String key = "tenant:" + tenantId + ":user_session:" + userId;
-        redisTemplate.opsForValue().set(key, sessionId, Duration.ofHours(1));
-    }
-
-    public String getSessionIdByUserId(String tenantId, String userId) {
-        String key = "tenant:" + tenantId + ":user_session:" + userId;
-        return (String) redisTemplate.opsForValue().get(key);
-    }
-
-    public void deleteUserSessionMapping(String tenantId, String userId) {
-        String key = "tenant:" + tenantId + ":user_session:" + userId;
-        redisTemplate.delete(key);
-    }
-
-    // Assign customer to agent
-    public void assignCustomerToAgent(String tenantId, String agentId, String customerId) {
-        // Retrieve agent's session info
-        SessionInfo agentSessionInfo = getSessionInfoByUserId(tenantId, agentId);
-        if (agentSessionInfo != null) {
-            // Assume agent handles multiple customers
-            List<String> assignedCustomers = agentSessionInfo.getAssignedTo() != null
-                    ? new ArrayList<>(Arrays.asList(agentSessionInfo.getAssignedTo().split(",")))
-                    : new ArrayList<>();
-            assignedCustomers.add(customerId);
-            agentSessionInfo.setAssignedTo(String.join(",", assignedCustomers));
-            saveSessionInfo(agentSessionInfo);
-        } else {
-            log.warn("No session info found for agent {}", agentId);
-        }
-    }
-
-    // Get assigned agent for customer
-    public String getAssignedAgent(String tenantId, String customerId) {
-        SessionInfo customerSessionInfo = getSessionInfoByUserId(tenantId, customerId);
-        return customerSessionInfo != null ? customerSessionInfo.getAssignedTo() : null;
-    }
-
-    // Get assigned customers for agent
-    public List<String> getAssignedCustomers(String tenantId, String agentId) {
-        SessionInfo agentSessionInfo = getSessionInfoByUserId(tenantId, agentId);
-        if (agentSessionInfo != null && agentSessionInfo.getAssignedTo() != null) {
-            return Arrays.asList(agentSessionInfo.getAssignedTo().split(","));
-        }
-        return Collections.emptyList();
-    }
-
-    // Get SessionInfo by userId
-    public SessionInfo getSessionInfoByUserId(String tenantId, String userId) {
-        String sessionId = getSessionIdByUserId(tenantId, userId);
-        if (sessionId != null) {
-            return getSessionInfo(tenantId, sessionId);
-        }
-        return null;
-    }
-
-    // Save chat message
+    // Save chat message to both Redis and MongoDB
     public void saveMessage(ChatMessage chatMessage) {
         saveMessageToRedis(chatMessage);
         saveMessageToMongo(chatMessage);
@@ -120,63 +51,24 @@ public class ChatService {
         log.info("Saved message to Redis under key: {}", key);
     }
 
+    // Save message to MongoDB
     private void saveMessageToMongo(ChatMessage chatMessage) {
         String collectionName = "chat_messages_" + chatMessage.getTenantId();
         mongoTemplate.save(chatMessage, collectionName);
     }
 
-    // Get messages for a customer
-    public List<ChatMessage> getMessagesForCustomer(String tenantId, String customerId) {
-        String key = "tenant:" + tenantId + ":chat:customer_messages:" + customerId;
-        List<Object> messages = redisTemplate.opsForList().range(key, 0, -1);
-        if (messages != null) {
-            return messages.stream()
-                    .map(message -> (ChatMessage) message)
-                    .collect(Collectors.toList());
-        }
-        return Collections.emptyList();
+    // Get available agents for a tenant
+    public List<String> getAvailableAgents(String tenantId) {
+        Queue<String> agentQueue = tenantAgentQueueMap.get(tenantId);
+        return agentQueue != null ? new ArrayList<>(agentQueue) : Collections.emptyList();
     }
 
-    public List<ChatMessage> getChatHistory(String tenantId, String customerId) {
-        String collectionName = "chat_messages_" + tenantId;
-        Query query = new Query();
-        query.addCriteria(Criteria.where("customerId").is(customerId));
-        query.with(Sort.by(Sort.Direction.ASC, "timestamp"));
-        return mongoTemplate.find(query, ChatMessage.class, collectionName);
-    }
-
-    public List<ChatMessage> getChatHistory(String tenantId, String customerId, int page, int size) {
-        String collectionName = "chat_messages_" + tenantId;
-        Query query = new Query();
-        query.addCriteria(Criteria.where("customerId").is(customerId));
-        query.with(Sort.by(Sort.Direction.ASC, "timestamp"));
-        query.skip(page * size);
-        query.limit(size);
-        return mongoTemplate.find(query, ChatMessage.class, collectionName);
-    }
-
-    public long countChatMessages(String tenantId, String customerId) {
-        String collectionName = "chat_messages_" + tenantId;
-        Query query = new Query();
-        query.addCriteria(Criteria.where("customerId").is(customerId));
-        return mongoTemplate.count(query, collectionName);
-    }
-
-
-
-    // Agent availability management
+    // Add an agent to the available list for a tenant
     public void addAgentToAvailableList(String tenantId, String agentId) {
         tenantAgentQueueMap.computeIfAbsent(tenantId, k -> new LinkedList<>()).add(agentId);
     }
 
-    public String findAvailableAgent(String tenantId) {
-        Queue<String> agentQueue = tenantAgentQueueMap.get(tenantId);
-        if (agentQueue != null && !agentQueue.isEmpty()) {
-            return agentQueue.poll(); // Get next available agent
-        }
-        return null; // No available agents
-    }
-
+    // Remove an agent from the available list for a tenant
     public void removeAgentFromAvailableList(String tenantId, String agentId) {
         Queue<String> agentQueue = tenantAgentQueueMap.get(tenantId);
         if (agentQueue != null) {
@@ -184,7 +76,13 @@ public class ChatService {
         }
     }
 
-    // Session-Tenant mapping
+    // Save session to user mapping
+    public void saveUserSessionMapping(String tenantId, String userId, String sessionId) {
+        String key = "tenant:" + tenantId + ":user_session:" + userId;
+        redisTemplate.opsForValue().set(key, sessionId, Duration.ofHours(1));
+    }
+
+    // Map session to tenant
     public void saveSessionTenantMapping(String sessionId, String tenantId) {
         String key = "session_tenant_mapping:" + sessionId;
         redisTemplate.opsForValue().set(key, tenantId, Duration.ofHours(1));
@@ -195,13 +93,15 @@ public class ChatService {
         return (String) redisTemplate.opsForValue().get(key);
     }
 
-    public void deleteSessionTenantMapping(String sessionId) {
-        String key = "session_tenant_mapping:" + sessionId;
+    public void deleteUserSessionMapping(String tenantId, String userId) {
+        String key = "tenant:" + tenantId + ":user_session:" + userId;
         redisTemplate.delete(key);
     }
 
-    // Getter for RedisTemplate
-    public RedisTemplate<String, Object> getRedisTemplate() {
-        return redisTemplate;
+    public void deleteSessionInfo(String tenantId, String sessionId) {
+        String key = "tenant:" + tenantId + ":session:" + sessionId;
+        redisTemplate.delete(key);
+        log.info("Deleted session info for session ID {} under tenant {}", sessionId, tenantId);
     }
+
 }

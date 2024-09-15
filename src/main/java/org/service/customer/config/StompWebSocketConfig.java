@@ -31,6 +31,9 @@ public class StompWebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // Use RabbitMQ as the STOMP broker relay
+        config.setApplicationDestinationPrefixes("/app");
+        config.setUserDestinationPrefix("/user");
+
         config.enableStompBrokerRelay("/topic", "/queue")
                 .setRelayHost(relayHost)
                 .setRelayPort(relayPort)
@@ -40,15 +43,14 @@ public class StompWebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setSystemPasscode(relayPasscode)
                 .setVirtualHost(relayVirtualHost);
 
-        config.setApplicationDestinationPrefixes("/app");
-        config.setUserDestinationPrefix("/user");
+
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 .setHandshakeHandler(new UserHandshakeHandler())
-                .setAllowedOriginPatterns("http://localhost:3000", "https://cdiptangshu.github.io")
+                .setAllowedOriginPatterns("http://localhost:3000", "http://localhost:3001","https://cdiptangshu.github.io")
                 .withSockJS();
     }
 
