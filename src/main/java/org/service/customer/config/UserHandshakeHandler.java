@@ -1,5 +1,6 @@
 package org.service.customer.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
@@ -7,6 +8,7 @@ import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
 import java.security.Principal;
 import java.util.Map;
 
+@Slf4j
 public class UserHandshakeHandler extends DefaultHandshakeHandler {
 
     @Override
