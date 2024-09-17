@@ -338,7 +338,7 @@ public class ChatService {
      * This method can be used to perform any additional acknowledgment logic if needed.
      */
     public void acknowledgeMessage(String sessionId) {
-        // Implement any additional logic if necessary
+        // TODO
         log.info("Acknowledged message for session ID {}", sessionId);
     }
 

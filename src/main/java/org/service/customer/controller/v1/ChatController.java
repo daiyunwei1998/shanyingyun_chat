@@ -4,6 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.service.ChatService;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -17,9 +22,13 @@ import java.time.Instant;
 public class ChatController {
 
     private final ChatService chatService;
+    private final RabbitAdmin rabbitAdmin;
+    private final TopicExchange topicExchange;
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, RabbitAdmin rabbitAdmin, TopicExchange topicExchange) {
         this.chatService = chatService;
+        this.rabbitAdmin = rabbitAdmin;
+        this.topicExchange = topicExchange;
     }
 
     @MessageMapping("/chat.addUser")
@@ -32,6 +41,19 @@ public class ChatController {
             log.error("Missing user information in chat message");
             return;
         }
+
+        // TODO delte this temporal solution
+        Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
+        rabbitAdmin.declareQueue(newCustomerQueue);
+
+
+        // Bind queues to the 'amq.topic' exchange with appropriate routing keys
+        Binding newCustomerBinding = BindingBuilder.bind(newCustomerQueue)
+                .to(topicExchange)
+                .with(tenantId + ".new_customer");
+        rabbitAdmin.declareBinding(newCustomerBinding);
+
+
 
         chatMessage.setSessionId(headerAccessor.getSessionId());
 
