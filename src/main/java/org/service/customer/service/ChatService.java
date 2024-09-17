@@ -152,9 +152,11 @@ public class ChatService {
         Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
         Queue customerMessageQueue = new Queue(tenantId + ".customer_message", true);
         Queue aiMessageQueue = new Queue(tenantId + ".ai_message", true);
+        Queue customerWaitingQueue = new Queue(tenantId + ".customer_waiting", true);
         rabbitAdmin.declareQueue(newCustomerQueue);
         rabbitAdmin.declareQueue(customerMessageQueue);
         rabbitAdmin.declareQueue(aiMessageQueue);
+        rabbitAdmin.declareQueue(customerWaitingQueue);
 
         // Bind queues to the 'amq.topic' exchange with appropriate routing keys
         Binding newCustomerBinding = BindingBuilder.bind(newCustomerQueue)
@@ -171,6 +173,11 @@ public class ChatService {
                 .to(topicExchange)
                 .with(tenantId + ".ai_message");
         rabbitAdmin.declareBinding(aiMessageBinding);
+
+        Binding customerWaitingBinding = BindingBuilder.bind(customerWaitingQueue)
+                .to(topicExchange)
+                .with(tenantId + ".customer_waiting");
+        rabbitAdmin.declareBinding(customerWaitingBinding);
 
         log.info("Queues {} and {} bound to exchange {} with routing keys {} and {}",
                 newCustomerQueue.getName(),
@@ -269,6 +276,18 @@ public class ChatService {
         }
     }
 
+    // notify new customer in waiting queue
+    public void publishCustomerWaiting(ChatMessage chatMessage) {
+        String tenantId = chatMessage.getTenantId();
+        try {
+            String messageBody = convertChatMessageToJson(chatMessage);
+            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_waiting", chatMessage);
+            log.info("notify customer waiting to {}", "/topic/" + tenantId + ".customer_waiting");
+    } catch (Exception e) {
+            log.error("Failed to forward message to AI agent: {}", e.getMessage());
+        }
+    }
+
     // ------------------- Session-Agent Mapping -------------------
 
     // Assign an agent to a session
@@ -288,6 +307,11 @@ public class ChatService {
         if (agentId != null) {
             log.info("Removed agent {} from session {}", agentId, sessionId);
         }
+    }
+
+    // hand over session to agent
+    public void handoverSessionToAgent(String sessionId, String agentId) {
+        // TODO
     }
 
     // ------------------- Handling Responses -------------------
