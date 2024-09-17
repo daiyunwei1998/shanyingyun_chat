@@ -151,7 +151,7 @@ public class ChatService {
         // Create tenant-specific queues
         Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
         Queue customerMessageQueue = new Queue(tenantId + ".customer_message", true);
-        Queue aiMessageQueue = new Queue(tenantId + ".ai_message", true);
+        Queue aiMessageQueue = new Queue("ai_message", true);
         Queue customerWaitingQueue = new Queue(tenantId + ".customer_waiting", true);
         rabbitAdmin.declareQueue(newCustomerQueue);
         rabbitAdmin.declareQueue(customerMessageQueue);
@@ -171,7 +171,7 @@ public class ChatService {
 
         Binding aiMessageBinding = BindingBuilder.bind(aiMessageQueue)
                 .to(topicExchange)
-                .with(tenantId + ".ai_message");
+                .with("ai_message");
         rabbitAdmin.declareBinding(aiMessageBinding);
 
         Binding customerWaitingBinding = BindingBuilder.bind(customerWaitingQueue)
@@ -269,7 +269,7 @@ public class ChatService {
         String messageBody = convertChatMessageToJson(chatMessage);
 
         try {
-            messagingTemplate.convertAndSend("/topic/" + tenantId + ".ai_message", messageBody);
+            messagingTemplate.convertAndSend("/topic/" + "ai_message", messageBody);
             log.info("Forwarded message to AI agent ");
         } catch (Exception e) {
             log.error("Failed to forward message to AI agent: {}", e.getMessage());
