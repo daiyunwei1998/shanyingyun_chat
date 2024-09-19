@@ -3,11 +3,12 @@ package org.service.customer.models;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.sql.Timestamp;
 
 @Entity
-@Data
+@Data @ToString
 public class User {
 
     @Id
