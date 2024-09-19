@@ -27,7 +27,7 @@ public class TenantTableService {
                         "`password` VARCHAR(255) NOT NULL, " +
                         "`email` VARCHAR(255) NOT NULL UNIQUE, " +
                         "`registered_time` TIMESTAMP NOT NULL, " +
-                        "`signed_time` TIMESTAMP NOT NULL, " +
+                        "`signed_time` TIMESTAMP, " +
                         "`role` VARCHAR(255) NOT NULL, " +
                         "`tenant_id` VARCHAR(255) NOT NULL" +
                         ");", tenantId);
