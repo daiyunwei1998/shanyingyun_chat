@@ -1,19 +1,22 @@
 package org.service.customer.repository.user;
 
+import lombok.extern.slf4j.Slf4j;
 import org.service.customer.models.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
 
-import java.sql.Time;
+
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Repository
 public class UserRepositoryImpl implements UserRepository {
 
@@ -78,5 +81,25 @@ public class UserRepositoryImpl implements UserRepository {
 
         jdbcTemplate.update(query, params);
     }
+
+    public User findByEmailAndTenantId(String username, String tenantId) {
+
+        // Directly concatenate tenantId into the table name
+        String query = "SELECT * FROM " + tenantId + "_users WHERE email = :email";
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("email", username);
+
+        List<User> users = jdbcTemplate.query(query, params, new BeanPropertyRowMapper<>(User.class));
+
+        if (users.size() > 0) {
+            log.info("User found: " + username + " in tenant " + tenantId);
+            return users.get(0);
+        }
+
+        log.info("User not found: " + username + " in tenant " + tenantId);
+        return null;
+    }
+
 }
 

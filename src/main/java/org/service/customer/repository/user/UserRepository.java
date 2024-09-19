@@ -15,5 +15,7 @@ public interface UserRepository {
     void update(User user);
 
     void deleteByIdAndTenantId(Long id, String tenantId);
+
+    User findByEmailAndTenantId(String username, String tenantId);
 }
 
