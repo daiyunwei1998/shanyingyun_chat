@@ -1,4 +1,4 @@
-package org.service.customer.dto.auth;
+package org.service.customer.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
