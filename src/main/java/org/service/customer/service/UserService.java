@@ -1,28 +1,32 @@
 package org.service.customer.service;
 
-import org.service.customer.dto.auth.RegisterRequest;
+import org.service.customer.dto.user.RegisterRequest;
+import org.service.customer.dto.user.UpdateUserRequest;
 import org.service.customer.exceptions.auth.InvalidRegisterInfo;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.service.customer.models.User;
+import org.service.customer.repository.user.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.sql.JDBCType;
 import java.sql.Timestamp;
+import java.util.List;
 
 @Service
-public class AuthService {
+public class UserService {
 
     private final JdbcTemplate jdbcTemplate;
     private final BCryptPasswordEncoder passwordEncoder;
     private final TenantTableService tenantTableService;
+    private final UserRepository userRepository;
 
-    public AuthService(JdbcTemplate jdbcTemplate, BCryptPasswordEncoder bCryptPasswordEncoder, TenantTableService tenantTableService) {
+    public UserService(JdbcTemplate jdbcTemplate, BCryptPasswordEncoder bCryptPasswordEncoder, TenantTableService tenantTableService, UserRepository userRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = bCryptPasswordEncoder;
         this.tenantTableService = tenantTableService;
+        this.userRepository = userRepository;
     }
 
     public void registerUser(RegisterRequest registerRequest) {
@@ -79,4 +83,32 @@ public class AuthService {
         // Execute the update using JdbcTemplate
         jdbcTemplate.update(sql, newName, userId);
     }
+
+
+    public User getUserById(Long userId, String tenantId) {
+        return userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found for tenant " + tenantId));
+    }
+
+
+    public List<User> getAllUsers(String tenantId) {
+        return userRepository.findAllByTenantId(tenantId);
+    }
+
+
+    public void updateUser(Long userId, String tenantId, UpdateUserRequest updateUserRequest) {
+        User user = userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found for tenant " + tenantId));
+        user.setName(updateUserRequest.getName());
+        user.setPassword(updateUserRequest.getPassword());
+        user.setEmail(updateUserRequest.getEmail());
+        userRepository.update(user);
+    }
+
+    public void deleteUser(Long userId, String tenantId) {
+        User user = userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found for tenant " + tenantId));
+        userRepository.deleteByIdAndTenantId(userId, tenantId);
+    }
+
 }
