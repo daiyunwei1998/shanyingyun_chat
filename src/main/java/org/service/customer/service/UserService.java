@@ -8,7 +8,7 @@ import org.service.customer.repository.user.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -18,15 +18,15 @@ import java.util.List;
 public class UserService {
 
     private final JdbcTemplate jdbcTemplate;
-    private final BCryptPasswordEncoder passwordEncoder;
     private final TenantTableService tenantTableService;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(JdbcTemplate jdbcTemplate, BCryptPasswordEncoder bCryptPasswordEncoder, TenantTableService tenantTableService, UserRepository userRepository) {
+    public UserService(JdbcTemplate jdbcTemplate, TenantTableService tenantTableService, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.jdbcTemplate = jdbcTemplate;
-        this.passwordEncoder = bCryptPasswordEncoder;
         this.tenantTableService = tenantTableService;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public void registerUser(RegisterRequest registerRequest) {
@@ -111,4 +111,7 @@ public class UserService {
         userRepository.deleteByIdAndTenantId(userId, tenantId);
     }
 
+    public User getUserByEmail(String username,String tenantId) {
+        return userRepository.findByEmailAndTenantId(username, tenantId);
+    }
 }
