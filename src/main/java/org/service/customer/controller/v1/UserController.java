@@ -1,25 +1,40 @@
 package org.service.customer.controller.v1;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.service.customer.dto.api.ErrorDto;
 import org.service.customer.dto.api.ResponseDto;
+import org.service.customer.dto.user.LoginRequest;
 import org.service.customer.dto.user.RegisterRequest;
 import org.service.customer.dto.user.UpdateUserRequest;
 import org.service.customer.models.User;
 import org.service.customer.service.UserService;
+import org.service.customer.utils.JwtCookieUtil;
+import org.service.customer.utils.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/tenants/{tenantId}/users")
 public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@PathVariable("tenantId") String tenantId, @Valid @RequestBody RegisterRequest registerRequest) {
@@ -32,6 +47,26 @@ public class UserController {
             return new ResponseEntity<>(new ResponseDto("Invalid input: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         }
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+        // authenticate the user
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getEmail(), loginRequest.getPassword()
+                )
+        );
+
+        // Generate the JWT token
+        String jwt = jwtTokenProvider.generateToken(authentication);
+
+        // Add the JWT to the cookie
+        JwtCookieUtil.addJwtToCookie(jwt, response);
+
+        // Return response
+        return ResponseEntity.ok().body("Login successful!");
+    }
+
 
     // Fetch a user by ID (GET)
     @GetMapping("/{id}")
