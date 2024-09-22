@@ -78,6 +78,17 @@ public class UserController {
         return ResponseEntity.ok().body(new ResponseDto<>(jwt));
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        // Clear the cookie
+        CookieUtil.clearCookie("jwt", response);
+        CookieUtil.clearCookie("userName", response);
+        CookieUtil.clearCookie("userId", response);
+
+        // Return response
+        return ResponseEntity.ok().body(new ResponseDto<>("logged out"));
+    }
+
 
     // Fetch a user by ID (GET)
     @GetMapping("/{id}")
