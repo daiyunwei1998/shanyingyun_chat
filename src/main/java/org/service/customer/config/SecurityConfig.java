@@ -111,6 +111,8 @@ public class SecurityConfig {
         configuration.addAllowedOriginPattern("http://localhost.com:3000");
         configuration.addAllowedOriginPattern("http://203.204.185.67:3000");
         configuration.addAllowedOriginPattern("http://203.204.185.67:3001");
+        configuration.addAllowedOriginPattern("http://www.yunweidai.net:3000");
+        configuration.addAllowedOriginPattern("http://www.yunweidai.net:3001");
 
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));

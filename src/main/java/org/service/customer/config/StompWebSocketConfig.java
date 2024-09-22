@@ -50,7 +50,7 @@ public class StompWebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 .setHandshakeHandler(new UserHandshakeHandler())
-                .setAllowedOriginPatterns("http://localhost:3000", "http://localhost:3001","http://203.204.185.67:3000", "http://203.204.185.67:3001")
+                .setAllowedOriginPatterns("http://localhost:3000", "http://localhost:3001","http://203.204.185.67:3000", "http://203.204.185.67:3001","http://www.yunweidai.net:3000", "http://www.yunweidai.net:3001")
                 .withSockJS();
     }
 
