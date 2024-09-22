@@ -1,9 +1,9 @@
 package org.service.customer.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.service.customer.filters.CustomTenantFilter;
 import org.service.customer.filters.JwtAuthenticationFilter;
 import org.service.customer.filters.RequestLoggingFilter;
+import org.service.customer.filters.TenantContextFilter;
 import org.service.customer.repository.tenant.TenantRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,23 +17,16 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Configuration
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final CustomTenantFilter customTenantFilter;
     private final RequestLoggingFilter requestLoggingFilter;
     private final TenantRepository tenantRepository;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, CustomTenantFilter customTenantFilter, RequestLoggingFilter requestLoggingFilter, TenantRepository tenantRepository) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.customTenantFilter = customTenantFilter;
+    public SecurityConfig(RequestLoggingFilter requestLoggingFilter, TenantRepository tenantRepository) {
         this.requestLoggingFilter = requestLoggingFilter;
         this.tenantRepository = tenantRepository;
     }
@@ -50,15 +43,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/register").permitAll()  // Public access
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/login").permitAll()
+                        .requestMatchers("/api/v1/tenants/{tenantId}/users/logout").permitAll()
                         .requestMatchers("/api/v1/admin/login").permitAll()
-                        .requestMatchers("/api/v1/tenants/{tenantId}/users/**").hasRole("ADMIN")  // Restrict to ADMIN role
+                        //.requestMatchers("/api/v1/tenants/{tenantId}/users/**").hasRole("ADMIN")  // Restrict to ADMIN role
                         .anyRequest().authenticated()
                 )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(requestLoggingFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(customTenantFilter, UsernamePasswordAuthenticationFilter.class) // Register custom filter
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new TenantContextFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -107,6 +101,7 @@ public class SecurityConfig {
 
         // Also allow the main domain without subdomain
         configuration.addAllowedOrigin("http://localhost:3000");
+        configuration.addAllowedOrigin("http://localhost:3001");
         configuration.addAllowedOrigin("https://localhost:3000");
         configuration.addAllowedOriginPattern("http://localhost.com:3000");
 

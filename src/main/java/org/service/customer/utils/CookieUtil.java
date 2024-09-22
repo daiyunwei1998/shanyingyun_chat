@@ -1,5 +1,6 @@
 package org.service.customer.utils;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseCookie;
@@ -48,6 +49,13 @@ public class CookieUtil {
         response.addHeader("Set-Cookie", tenantCookie.toString());
         // Log the cookie being set (be cautious with logging sensitive information in production)
         log.debug("Setting tenant cookie: {}", tenantCookie.toString());
+    }
+
+    public static void clearCookie(String key, HttpServletResponse response) {
+        Cookie cookie = new Cookie(key, "");
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 
 

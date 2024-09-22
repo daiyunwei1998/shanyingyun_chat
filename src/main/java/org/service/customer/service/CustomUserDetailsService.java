@@ -25,6 +25,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         String tenantId = tenantContext.get();
 
         if (tenantId == null) {
+            log.error("tenant ID Missing");
             throw new UsernameNotFoundException("Tenant ID is missing");
         }
 
