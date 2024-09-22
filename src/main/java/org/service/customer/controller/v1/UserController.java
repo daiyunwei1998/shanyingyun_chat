@@ -8,6 +8,7 @@ import org.service.customer.dto.api.ResponseDto;
 import org.service.customer.dto.user.LoginRequest;
 import org.service.customer.dto.user.RegisterRequest;
 import org.service.customer.dto.user.UpdateUserRequest;
+import org.service.customer.models.CustomUserDetails;
 import org.service.customer.models.User;
 import org.service.customer.service.UserService;
 import org.service.customer.utils.CookieUtil;
@@ -58,6 +59,12 @@ public class UserController {
                         loginRequest.getEmail(), loginRequest.getPassword()
                 )
         );
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        String name = userDetails.getUser().getName();
+        CookieUtil.setCookie("userName",name,response);
+        Long id = userDetails.getUser().getId();
+        CookieUtil.setCookie("userId",Long.toString(id),response);
 
         // Generate the JWT token
         String jwt = jwtTokenProvider.generateToken(authentication);

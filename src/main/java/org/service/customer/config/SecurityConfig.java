@@ -102,10 +102,14 @@ public class SecurityConfig {
         // Allow all localhost subdomains
         configuration.addAllowedOriginPattern("http://*.localhost:3000");
         configuration.addAllowedOriginPattern("https://*.localhost:3000");
+        configuration.addAllowedOriginPattern("http://*.localhost.com:3000");
+
 
         // Also allow the main domain without subdomain
         configuration.addAllowedOrigin("http://localhost:3000");
         configuration.addAllowedOrigin("https://localhost:3000");
+        configuration.addAllowedOriginPattern("http://localhost.com:3000");
+
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "x-tenant-id", "credentials", "Set-Cookie"));

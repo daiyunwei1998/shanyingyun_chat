@@ -13,7 +13,8 @@ public class CookieUtil {
                // .secure(true)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
-                .sameSite("None")
+                .sameSite("Lax")
+                .domain("." + "localhost")
                 .build();
 
         response.addHeader("Set-Cookie", jwtCookie.toString());
@@ -28,7 +29,20 @@ public class CookieUtil {
                 // .secure(true)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
-                .sameSite("None")
+                .sameSite("Lax")
+                .domain("." + "localhost")
+                .build();
+
+        response.addHeader("Set-Cookie", tenantCookie.toString());
+        // Log the cookie being set (be cautious with logging sensitive information in production)
+        log.debug("Setting tenant cookie: {}", tenantCookie.toString());
+    }
+
+    public static void setCookie(String key, String value, HttpServletResponse response) {
+        ResponseCookie tenantCookie = ResponseCookie.from(key, value)
+                .httpOnly(true)
+                .path("/")
+                .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
                 .build();
 
         response.addHeader("Set-Cookie", tenantCookie.toString());
