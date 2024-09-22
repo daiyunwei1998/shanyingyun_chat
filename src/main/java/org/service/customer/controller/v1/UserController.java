@@ -38,12 +38,36 @@ public class UserController {
     private AuthenticationManager authenticationManager;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@PathVariable("tenantId") String tenantId, @Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<?> register(@PathVariable("tenantId") String tenantId, @Valid @RequestBody RegisterRequest registerRequest, HttpServletResponse response) {
         try {
             // Pass tenantId to the register request and AuthService
             registerRequest.setTenantId(tenantId);
             userService.registerUser(registerRequest);
-            return new ResponseEntity<>(new ResponseDto("User registered successfully for tenant " + tenantId), HttpStatus.CREATED);
+
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            registerRequest.getEmail(), registerRequest.getPassword()
+                    )
+            );
+
+            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+            String name = userDetails.getUser().getName();
+            CookieUtil.setCookie("userName",name,response);
+            Long id = userDetails.getUser().getId();
+            CookieUtil.setCookie("userId",Long.toString(id),response);
+
+            // Generate the JWT token
+            String jwt = jwtTokenProvider.generateToken(authentication);
+            // Add the JWT to the cookie
+            CookieUtil.addJwtToCookie(jwt, response);
+
+            // Add tenant id to cookie
+            CookieUtil.addTenantIdToCookie(tenantId, response);
+
+            // Return response
+            return ResponseEntity.ok().body(new ResponseDto<>(jwt));
+
+            //return new ResponseEntity<>(new ResponseDto("User registered successfully for tenant " + tenantId), HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(new ResponseDto("Invalid input: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         }
