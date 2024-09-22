@@ -7,6 +7,7 @@ import org.service.customer.filters.TenantContextFilter;
 import org.service.customer.repository.tenant.TenantRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -45,6 +46,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Use this syntax to disable CSRF in the new version
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/register").permitAll()  // Public access
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/login").permitAll()
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/logout").permitAll()
