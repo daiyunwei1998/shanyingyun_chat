@@ -10,7 +10,7 @@ import org.service.customer.dto.user.RegisterRequest;
 import org.service.customer.dto.user.UpdateUserRequest;
 import org.service.customer.models.User;
 import org.service.customer.service.UserService;
-import org.service.customer.utils.JwtCookieUtil;
+import org.service.customer.utils.CookieUtil;
 import org.service.customer.utils.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -49,7 +49,9 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest,
+                                   @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId,
+                                   HttpServletResponse response) {
         // authenticate the user
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -59,12 +61,14 @@ public class UserController {
 
         // Generate the JWT token
         String jwt = jwtTokenProvider.generateToken(authentication);
-
         // Add the JWT to the cookie
-        JwtCookieUtil.addJwtToCookie(jwt, response);
+        CookieUtil.addJwtToCookie(jwt, response);
+
+        // Add tenant id to cookie
+        CookieUtil.addTenantIdToCookie(tenantId, response);
 
         // Return response
-        return ResponseEntity.ok().body("Login successful!");
+        return ResponseEntity.ok().body(new ResponseDto<>(jwt));
     }
 
 

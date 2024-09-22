@@ -8,9 +8,6 @@ import org.hibernate.validator.constraints.NotBlank;
 
 @Data @ToString
 public class LoginRequest {
-    @JsonProperty("tenant_id")
-    @NotBlank(message = "tenant id is required")
-    private String tenantId;
 
     @JsonProperty("password")
     @NotBlank(message = "Password is required")

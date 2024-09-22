@@ -4,8 +4,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.service.customer.dto.admin.AdminLoginRequest;
 import org.service.customer.dto.api.ResponseDto;
-import org.service.customer.dto.user.LoginRequest;
-import org.service.customer.utils.JwtCookieUtil;
+import org.service.customer.utils.CookieUtil;
 import org.service.customer.utils.JwtTokenProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -43,7 +42,7 @@ public class AdminController {
         String jwt = jwtTokenProvider.generateToken(authentication);
 
         // Add the JWT to the cookie
-        JwtCookieUtil.addJwtToCookie(jwt, response);
+        CookieUtil.addJwtToCookie(jwt, response);
 
         // Return response
         return ResponseEntity.ok().body(new ResponseDto<>("Admin login"));
