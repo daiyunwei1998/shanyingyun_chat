@@ -3,6 +3,7 @@ package org.service.customer.config;
 import lombok.extern.slf4j.Slf4j;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.service.ChatService;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -10,10 +11,11 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 @Slf4j
 @Component
 public class WebSocketEventListener {
-
+    private final RabbitAdmin rabbitAdmin;
     private final ChatService chatService;
 
-    public WebSocketEventListener(ChatService chatService) {
+    public WebSocketEventListener(RabbitAdmin rabbitAdmin, ChatService chatService) {
+        this.rabbitAdmin = rabbitAdmin;
         this.chatService = chatService;
     }
 
@@ -49,7 +51,12 @@ public class WebSocketEventListener {
             if ("agent".equals(userType)) {
                 // Remove agent from available list
                 chatService.removeAgentFromAvailableList(tenantId, userId);
+                return;
             }
+
+            String queueName = "messages-user" + sessionId;
+            rabbitAdmin.deleteQueue(queueName);
+            log.info("Deleted queue: " + queueName);
         } else {
             log.warn("No session info found for disconnected session ID {} under tenant {}", sessionId, tenantId);
         }

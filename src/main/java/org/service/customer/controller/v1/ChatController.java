@@ -10,33 +10,29 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Controller
 public class ChatController {
 
-    private final SimpMessagingTemplate messagingTemplate;
     private final ChatService chatService;
     private final RabbitAdmin rabbitAdmin;
     private final TopicExchange topicExchange;
 
-    public ChatController(SimpMessagingTemplate messagingTemplate, ChatService chatService, RabbitAdmin rabbitAdmin, TopicExchange topicExchange) {
-        this.messagingTemplate = messagingTemplate;
+    public ChatController(ChatService chatService, RabbitAdmin rabbitAdmin, TopicExchange topicExchange) {
         this.chatService = chatService;
         this.rabbitAdmin = rabbitAdmin;
         this.topicExchange = topicExchange;
     }
 
     @MessageMapping("/chat.addUser")
-    public void addUser(ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
+    public void addUser(@Payload ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
         String tenantId = chatMessage.getTenantId();
         String userId = chatMessage.getSender();
         String userType = chatMessage.getUserType();
@@ -45,6 +41,19 @@ public class ChatController {
             log.error("Missing user information in chat message");
             return;
         }
+
+        // TODO delte this temporal solution
+        Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
+        rabbitAdmin.declareQueue(newCustomerQueue);
+
+
+        // Bind queues to the 'amq.topic' exchange with appropriate routing keys
+        Binding newCustomerBinding = BindingBuilder.bind(newCustomerQueue)
+                .to(topicExchange)
+                .with(tenantId + ".new_customer");
+        rabbitAdmin.declareBinding(newCustomerBinding);
+
+
 
         chatMessage.setSessionId(headerAccessor.getSessionId());
 
@@ -64,48 +73,23 @@ public class ChatController {
         chatMessage.setTimestamp(Instant.now());
         chatMessage.setType(ChatMessage.MessageType.JOIN);
 
-        // Dynamically create and bind the queue for this tenant
-        createAndBindTenantQueue(tenantId);
+        // Delegate queue creation and binding to ChatService
+        chatService.createAndBindTenantQueues(tenantId);
 
         if ("agent".equals(userType)) {
-            log.info("Agent {} is now available under tenant {}", userId, tenantId);
             chatService.addAgentToAvailableList(tenantId, userId);
+            log.info("Agent {} is now available under tenant {}", userId, tenantId);
         }
 
         // Send a notification to all agents that a customer has joined
         if ("customer".equals(userType)) {
-            messagingTemplate.convertAndSend("/topic/" + tenantId + ".new_customer", chatMessage);
-            log.info("Message sent to: /topic/" + tenantId + ".new_customer");
+            chatService.notifyNewCustomerSession(tenantId, chatMessage);
+            log.info("Broadcasted customer join message to /topic/{}.new_customer", tenantId);
         }
     }
 
-    private void createAndBindTenantQueue(String tenantId) {
-        String stompExchange = "amq.topic"; // Default STOMP broker relay exchange
-
-        // Create tenant-specific queues
-        Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
-        Queue customerMessageQueue = new Queue(tenantId + ".customer_message", true);
-        rabbitAdmin.declareQueue(newCustomerQueue);
-        rabbitAdmin.declareQueue(customerMessageQueue);
-
-        // Bind queues to the 'amq.topic' exchange with appropriate routing keys
-        Binding newCustomerBinding = BindingBuilder.bind(newCustomerQueue)
-                .to(new TopicExchange(stompExchange))
-                .with(tenantId + ".new_customer");
-        rabbitAdmin.declareBinding(newCustomerBinding);
-
-        Binding customerMessageBinding = BindingBuilder.bind(customerMessageQueue)
-                .to(new TopicExchange(stompExchange))
-                .with(tenantId + ".customer_message");
-        rabbitAdmin.declareBinding(customerMessageBinding);
-
-        log.info("Queues {} and {} bound to exchange {} with routing keys {} and {}",
-                newCustomerQueue.getName(), customerMessageQueue.getName(),
-                stompExchange, tenantId + ".new_customer", tenantId + ".customer_message");
-    }
-
     @MessageMapping("/chat.sendMessage")
-    public void sendMessage(ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
+    public void sendMessage(@Payload ChatMessage chatMessage, Principal principal, SimpMessageHeaderAccessor headerAccessor) {
         String tenantId = chatMessage.getTenantId();
         String userId = chatMessage.getSender();
         String userType = chatMessage.getUserType();
@@ -127,33 +111,17 @@ public class ChatController {
 
         if ("customer".equals(sessionInfo.getUserType())) {
             chatMessage.setSource(ChatMessage.SourceType.USER);
-
-            // Broadcast the message to all available agents
-            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_message", chatMessage);
-
+            chatService.broadcastMessage(chatMessage);
+            log.info("Broadcasted customer message from {} under tenant {}", userId, tenantId);
         } else if ("agent".equals(sessionInfo.getUserType())) {
             chatMessage.setSource(ChatMessage.SourceType.AGENT);
-
-            // Send the agent's reply directly to the customer
-            messagingTemplate.convertAndSendToUser(chatMessage.getReceiver(), "/queue/messages", chatMessage);
+            // 'receiver' contains the customer's userId
+            // Forward the message directly to the customer via SimpMessagingTemplate
+            chatService.sendAgentMessageToCustomer(chatMessage);
+            log.info("Sent agent {} message to customer {} under tenant {}", userId, chatMessage.getReceiver(), tenantId);
         }
 
         // Save the message
         chatService.saveMessage(chatMessage);
     }
-
-    // Utility method to extract tenantId from Principal
-    private String getTenantIdFromPrincipal(Principal principal) {
-        String name = principal.getName(); // Expected format: tenantId:username
-        String[] parts = name.split(":");
-        if (parts.length == 2) {
-            return parts[0];
-        } else {
-            log.error("Invalid principal name format: {}", name);
-            return null;
-        }
-    }
-
-
-
 }
