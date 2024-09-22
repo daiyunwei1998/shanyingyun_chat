@@ -25,10 +25,14 @@ public class SecurityConfig {
 
     private final RequestLoggingFilter requestLoggingFilter;
     private final TenantRepository tenantRepository;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final TenantContextFilter tenantContextFilter;
 
-    public SecurityConfig(RequestLoggingFilter requestLoggingFilter, TenantRepository tenantRepository) {
+    public SecurityConfig(RequestLoggingFilter requestLoggingFilter, TenantRepository tenantRepository, JwtAuthenticationFilter jwtAuthenticationFilter, TenantContextFilter tenantContextFilter) {
         this.requestLoggingFilter = requestLoggingFilter;
         this.tenantRepository = tenantRepository;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.tenantContextFilter = tenantContextFilter;
     }
 
     @Bean
@@ -45,14 +49,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/login").permitAll()
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/logout").permitAll()
                         .requestMatchers("/api/v1/admin/login").permitAll()
+                        .requestMatchers("/ws/*").permitAll()
                         //.requestMatchers("/api/v1/tenants/{tenantId}/users/**").hasRole("ADMIN")  // Restrict to ADMIN role
                         .anyRequest().authenticated()
                 )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(requestLoggingFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new TenantContextFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
