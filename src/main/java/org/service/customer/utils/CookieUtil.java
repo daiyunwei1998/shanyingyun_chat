@@ -15,7 +15,6 @@ public class CookieUtil {
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
                 .sameSite("Lax")
-                .domain("." + "localhost")
                 .build();
 
         response.addHeader("Set-Cookie", jwtCookie.toString());
@@ -31,7 +30,6 @@ public class CookieUtil {
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
                 .sameSite("Lax")
-                .domain("." + "localhost")
                 .build();
 
         response.addHeader("Set-Cookie", tenantCookie.toString());
