@@ -108,6 +108,7 @@ public class UserController {
         CookieUtil.clearCookie("jwt", response);
         CookieUtil.clearCookie("userName", response);
         CookieUtil.clearCookie("userId", response);
+        CookieUtil.clearCookie("tenantId", response);
 
         // Return response
         return ResponseEntity.ok().body(new ResponseDto<>("logged out"));
