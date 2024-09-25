@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.ToString;
 
 import java.io.Serializable;
-import java.time.Instant;
 
 @Data
 @ToString
@@ -27,7 +26,6 @@ public class ChatMessage implements Serializable {
     private String customerId;
 
     public ChatMessage() {
-        this.timestamp = Instant.now();
     }
 
     public enum MessageType {
