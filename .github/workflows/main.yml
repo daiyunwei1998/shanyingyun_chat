@@ -42,4 +42,4 @@ jobs:
           sudo systemctl stop platform-service
           sudo systemctl start platform-service
           echo "Deployment completed"
-EOF
+        EOF
