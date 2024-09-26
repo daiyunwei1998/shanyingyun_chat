@@ -1,4 +1,4 @@
-name: Build and Deploy Spring Boot App
+name: Build and Deploy Platform Service
 on:
   push:
     branches:
@@ -30,8 +30,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: app
-    - name: Install sshpass
-      run: sudo apt-get install sshpass
     - name: Deploy to Server
       env:
         SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -40,9 +38,25 @@ jobs:
         DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       run: |
         sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no *.jar ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_PATH}/app.jar
-        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} '
-          mkdir -p ${DEPLOY_PATH}/logs
-          if pgrep java; then pkill java; fi
-          nohup java -jar ${DEPLOY_PATH}/app.jar > ${DEPLOY_PATH}/logs/app.log 2>&1 &
+        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} << EOF
+          sudo bash -c 'cat > /etc/systemd/system/platform-service.service << EOL
+        [Unit]
+        Description=Platform Service
+        After=network.target
+
+        [Service]
+        User=$SSH_USERNAME
+        ExecStart=/usr/bin/java -jar $DEPLOY_PATH/app.jar
+        SuccessExitStatus=143
+        TimeoutStopSec=10
+        Restart=on-failure
+        RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+        EOL'
+          sudo systemctl daemon-reload
+          sudo systemctl enable platform-service
+          sudo systemctl restart platform-service
           echo "Deployment completed"
-        '
+        EOF
