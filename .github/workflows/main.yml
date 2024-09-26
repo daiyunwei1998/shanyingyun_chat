@@ -4,64 +4,55 @@ on:
     branches:
       - dev
   workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
+
       - name: Build with Maven
         run: |
           mkdir -p ~/.ssh
           mvn clean package -DskipTests
+
       - name: Add EC2 to known_hosts
         run: |
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy to EC2
         env:
           PRIVATE_KEY: ${{ secrets.SSH_KEY }}
         run: |
-          echo "${PRIVATE_KEY}" > private_key.pem
+          echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-          # SCP the JAR file to EC2
           scp -o StrictHostKeyChecking=no -i private_key.pem target/customer-0.0.1-SNAPSHOT.jar matcha@${{ secrets.SSH_HOST }}:~
-          # SSH to EC2 and set up the service
           ssh -o StrictHostKeyChecking=no -i private_key.pem matcha@${{ secrets.SSH_HOST }} << 'EOF'
-            set -x  # Enable debug mode
-            
-            # Create the systemd service file
+            set -x
             sudo tee /etc/systemd/system/customer-service.service > /dev/null << EOT
-[Unit]
-Description=Customer Service
-After=network.target
+            [Unit]
+            Description=Customer Service
+            After=network.target
 
-[Service]
-User=matcha
-ExecStart=/usr/bin/java -jar /home/matcha/customer-0.0.1-SNAPSHOT.jar
-EnvironmentFile=/etc/environment
-Restart=always
+            [Service]
+            User=matcha
+            ExecStart=/usr/bin/java -jar /home/matcha/customer-0.0.1-SNAPSHOT.jar
+            EnvironmentFile=/etc/environment
+            Restart=always
 
-[Install]
-WantedBy=multi-user.target
-EOT
-
-            # Reload systemd to recognize the new service
+            [Install]
+            WantedBy=multi-user.target
+            EOT
             sudo systemctl daemon-reload
-
-            # Start the service
             sudo systemctl start customer-service
-
-            # Enable the service to start on boot
             sudo systemctl enable customer-service
-
-            # Check the status of the service
             sudo systemctl status customer-service
-
-            # View the logs
             journalctl -u customer-service -n 20 --no-pager
           EOF
