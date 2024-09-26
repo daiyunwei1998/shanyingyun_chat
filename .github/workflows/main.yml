@@ -30,28 +30,38 @@ jobs:
           chmod 600 private_key.pem
           # SCP the JAR file to EC2
           scp -o StrictHostKeyChecking=no -i private_key.pem target/customer-0.0.1-SNAPSHOT.jar matcha@${{ secrets.SSH_HOST }}:~
-          # SSH to EC2 and run deployment commands
+          # SSH to EC2 and set up the service
           ssh -o StrictHostKeyChecking=no -i private_key.pem matcha@${{ secrets.SSH_HOST }} << 'EOF'
             set -x  # Enable debug mode
-            echo "Current directory: $(pwd)"
-            echo "List of files:"
-            ls -la
-            PORT=8080
-            PID=$(lsof -ti:$PORT)
-            if [ -n "$PID" ]; then
-              echo "Killing process on port $PORT"
-              kill -9 $PID
-            else
-              echo "No process found on port $PORT"
-            fi
-            echo "Removing old log file"
-            rm -f app.log
-            echo "Starting application"
-            nohup java -jar customer-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
-            echo "Application started, PID: $!"
-            sleep 10  # Wait for the application to start
-            echo "Application log:"
-            tail -n 20 app.log
-            echo "Process status:"
-            ps aux | grep java
+            
+            # Create the systemd service file
+            sudo tee /etc/systemd/system/customer-service.service > /dev/null << EOT
+[Unit]
+Description=Customer Service
+After=network.target
+
+[Service]
+User=matcha
+ExecStart=/usr/bin/java -jar /home/matcha/customer-0.0.1-SNAPSHOT.jar
+EnvironmentFile=/etc/environment
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOT
+
+            # Reload systemd to recognize the new service
+            sudo systemctl daemon-reload
+
+            # Start the service
+            sudo systemctl start customer-service
+
+            # Enable the service to start on boot
+            sudo systemctl enable customer-service
+
+            # Check the status of the service
+            sudo systemctl status customer-service
+
+            # View the logs
+            journalctl -u customer-service -n 20 --no-pager
           EOF
