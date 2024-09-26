@@ -1,0 +1,80 @@
+name: Build and Deploy Spring Boot App
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'  # Install Eclipse Temurin JDK
+        java-version: '17'
+
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    - name: Build with Maven
+      run: mvn clean install -DskipTests
+
+    - name: Upload JAR Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: spring-boot-app
+        path: target/*.jar
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download JAR Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: spring-boot-app
+
+    - name: Install SSHpass
+      run: sudo apt-get install sshpass
+
+    - name: Deploy to Server
+      env:
+        SSH_HOST: ${{ secrets.SSH_HOST }}
+        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        # Ensure the logs folder exists
+        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no $SSH_USERNAME@$SSH_HOST "
+          mkdir -p $DEPLOY_PATH/logs;
+        "
+
+        # Use sshpass to copy JAR file to the server
+        sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar $SSH_USERNAME@$SSH_HOST:$DEPLOY_PATH/
+
+        # Restart the Spring Boot platform service with log redirection
+        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no $SSH_USERNAME@$SSH_HOST "
+          sudo systemctl stop platform.service;
+          sudo mv $DEPLOY_PATH/*.jar $DEPLOY_PATH/app.jar;
+
+          # Modify the service file to redirect logs to the logs folder
+          sudo sed -i '/ExecStart/ c\\ExecStart=/usr/bin/java -jar $DEPLOY_PATH/app.jar >> $DEPLOY_PATH/logs/app.log 2>&1' /etc/systemd/system/platform.service;
+
+          # Reload systemd to apply the changes
+          sudo systemctl daemon-reload;
+
+          # Start the service
+          sudo systemctl start platform.service;
+        "
