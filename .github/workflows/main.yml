@@ -46,35 +46,29 @@ jobs:
       with:
         name: spring-boot-app
 
-    - name: Install SSHpass
-      run: sudo apt-get install sshpass
-
-    - name: Deploy to Server
-      env:
-        SSH_HOST: ${{ secrets.SSH_HOST }}
-        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-        SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
-        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      run: |
-        # Ensure the logs folder exists
-        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no $SSH_USERNAME@$SSH_HOST "
+    # Use appleboy/ssh-action to handle SSH-related tasks
+    - name: Deploy to Server via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # Ensure the logs folder exists
           mkdir -p $DEPLOY_PATH/logs;
-        "
 
-        # Use sshpass to copy JAR file to the server
-        sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar $SSH_USERNAME@$SSH_HOST:$DEPLOY_PATH/
+          # Move the jar file to the deploy path
+          mv target/*.jar $DEPLOY_PATH/app.jar;
 
-        # Restart the Spring Boot platform service with log redirection
-        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no $SSH_USERNAME@$SSH_HOST "
+          # Stop the platform service
           sudo systemctl stop platform.service;
-          sudo mv $DEPLOY_PATH/*.jar $DEPLOY_PATH/app.jar;
 
-          # Modify the service file to redirect logs to the logs folder
+          # Redirect logs to the logs folder
           sudo sed -i '/ExecStart/ c\\ExecStart=/usr/bin/java -jar $DEPLOY_PATH/app.jar >> $DEPLOY_PATH/logs/app.log 2>&1' /etc/systemd/system/platform.service;
 
-          # Reload systemd to apply the changes
+          # Reload the systemd configuration to apply changes
           sudo systemctl daemon-reload;
 
-          # Start the service
+          # Start the platform service
           sudo systemctl start platform.service;
-        "
