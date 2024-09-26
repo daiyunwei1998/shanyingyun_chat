@@ -12,48 +12,37 @@ jobs:
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        distribution: 'temurin'  # Install Eclipse Temurin JDK
+        distribution: 'temurin'
         java-version: '17'
-    - name: Cache Maven packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-
     - name: Build with Maven
-      run: mvn clean install -DskipTests
-    - name: Upload JAR Artifact
+      run: mvn clean package -DskipTests
+    - name: Upload JAR
       uses: actions/upload-artifact@v3
       with:
-        name: spring-boot-app
+        name: app
         path: target/*.jar
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - name: Download JAR Artifact
+    - name: Download JAR
       uses: actions/download-artifact@v3
       with:
-        name: spring-boot-app
-    - name: Deploy to Server via SSH
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
-        password: ${{ secrets.SSH_PASSWORD }}
-        port: 22
-        script: |
-          DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-          # Ensure the logs folder exists
-          mkdir -p $DEPLOY_PATH/logs
-          # Move the jar file to the deploy path
-          mv *.jar $DEPLOY_PATH/app.jar
-          # Stop the platform service
-          sudo systemctl stop platform.service
-          # Redirect logs to the logs folder
-          sudo sed -i "/ExecStart/ c\ExecStart=/usr/bin/java -jar $DEPLOY_PATH/app.jar >> $DEPLOY_PATH/logs/app.log 2>&1" /etc/systemd/system/platform.service
-          # Reload the systemd configuration to apply changes
-          sudo systemctl daemon-reload
-          # Start the platform service
-          sudo systemctl start platform.service
+        name: app
+    - name: Deploy to Server
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PASSWORD }}
+        SSH_HOST: ${{ secrets.SSH_HOST }}
+        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+        scp -i private_key -o StrictHostKeyChecking=no *.jar ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_PATH}/app.jar
+        ssh -i private_key -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} '
+          mkdir -p ${DEPLOY_PATH}/logs
+          if pgrep java; then pkill java; fi
+          nohup java -jar ${DEPLOY_PATH}/app.jar > ${DEPLOY_PATH}/logs/app.log 2>&1 &
+          echo "Deployment completed"
+        '
+        rm -f private_key
