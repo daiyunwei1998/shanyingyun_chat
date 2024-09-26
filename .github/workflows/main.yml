@@ -3,8 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      
-develop
+      dev
 workflow_dispatch:
 
 jobs:
