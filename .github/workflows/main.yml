@@ -39,24 +39,7 @@ jobs:
       run: |
         sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no *.jar ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_PATH}/app.jar
         sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} << EOF
-          sudo bash -c 'cat > /etc/systemd/system/platform-service.service << EOL
-        [Unit]
-        Description=Platform Service
-        After=network.target
-
-        [Service]
-        User=$SSH_USERNAME
-        ExecStart=/usr/bin/java -jar $DEPLOY_PATH/app.jar
-        SuccessExitStatus=143
-        TimeoutStopSec=10
-        Restart=on-failure
-        RestartSec=5
-
-        [Install]
-        WantedBy=multi-user.target
-        EOL'
-          sudo systemctl daemon-reload
-          sudo systemctl enable platform-service
-          sudo systemctl restart platform-service
+          sudo systemctl stop platform-service
+          sudo systemctl start platform-service
           echo "Deployment completed"
-        EOF
+EOF
