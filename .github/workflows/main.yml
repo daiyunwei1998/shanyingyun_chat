@@ -30,19 +30,19 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: app
+    - name: Install sshpass
+      run: sudo apt-get install sshpass
     - name: Deploy to Server
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PASSWORD }}
+        SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         SSH_HOST: ${{ secrets.SSH_HOST }}
         SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
         DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       run: |
-        echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
-        scp -i private_key -o StrictHostKeyChecking=no *.jar ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_PATH}/app.jar
-        ssh -i private_key -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} '
+        sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no *.jar ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_PATH}/app.jar
+        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} '
           mkdir -p ${DEPLOY_PATH}/logs
           if pgrep java; then pkill java; fi
           nohup java -jar ${DEPLOY_PATH}/app.jar > ${DEPLOY_PATH}/logs/app.log 2>&1 &
           echo "Deployment completed"
         '
-        rm -f private_key
