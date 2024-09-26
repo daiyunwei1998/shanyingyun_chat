@@ -22,28 +22,58 @@ jobs:
 
       - name: Build with Maven
         run: |
-          mkdir -p ~/.ssh
           mvn clean package -DskipTests
 
       - name: Add EC2 to known_hosts
         run: |
+          mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         env:
           PRIVATE_KEY: ${{ secrets.SSH_KEY }}
         run: |
+          set -e  # Exit immediately if a command exits with a non-zero status
+          
+          # Save the private key
           echo "${PRIVATE_KEY}" > private_key.pem
           chmod 600 private_key.pem
+
+          # Enable verbose mode for SCP and SSH
+          SCP_OPTS="-v -o StrictHostKeyChecking=no -i private_key.pem"
+          SSH_OPTS="-v -o StrictHostKeyChecking=no -i private_key.pem"
+
           # SCP the JAR file to EC2
-          scp -o StrictHostKeyChecking=no -i private_key.pem target/customer-0.0.1-SNAPSHOT.jar matcha@${{ secrets.SSH_HOST }}:~
-          # SSH to EC2 and run deployment commands
-          ssh -o StrictHostKeyChecking=no -i private_key.pem matcha@${{ secrets.SSH_HOST }} << 'EOF'
+          scp $SCP_OPTS target/customer-0.0.1-SNAPSHOT.jar matcha@${{ secrets.SSH_HOST }}:~
+
+          # SSH to EC2 and run deployment commands with verbose logging
+          ssh $SSH_OPTS matcha@${{ secrets.SSH_HOST }} << 'EOF'
+            set -x  # Enable debug mode
             PORT=8080
+            echo "Checking for existing application on port $PORT..."
             PID=$(lsof -ti:$PORT)
             if [ -n "$PID" ]; then
+              echo "Killing process $PID running on port $PORT"
               kill -9 $PID
+            else
+              echo "No process found on port $PORT"
             fi
-            rm -f app.log
+            echo "Removing old log files..."
+            rm -f app.log nohup.out nohup.err
+
+            echo "Starting the application..."
             nohup java -jar customer-0.0.1-SNAPSHOT.jar > nohup.out 2> nohup.err < /dev/null &
-          EOF
+            echo "Application started with PID $!"
+            
+            echo "Verifying application is running..."
+            sleep 5
+            if lsof -ti:$PORT > /dev/null; then
+              echo "Application is running on port $PORT"
+            else
+              echo "Failed to start the application on port $PORT"
+              exit 1
+            fi
+EOF
+
+          # Clean up the private key
+          rm private_key.pem
