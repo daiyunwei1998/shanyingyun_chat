@@ -18,7 +18,7 @@ import java.util.function.Function;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${JWT_SECRET_KEY}")
+    @Value("${jwt.secret.key}")
     private String JWT_SECRET;
     private final long JWT_EXPIRATION = 604800000L; // 7 days
 
