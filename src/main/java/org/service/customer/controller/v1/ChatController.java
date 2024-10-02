@@ -17,6 +17,7 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 import java.time.Instant;
+import java.util.Objects;
 
 @Slf4j
 @Controller
@@ -132,10 +133,11 @@ public class ChatController {
         String userId = pickUpInfo.getCustomer();
         String type = pickUpInfo.getType();
         String sessionId = chatService.getSessionIdByUserId(tenantId, userId);
-        if (type == "pickup") {
+        log.info("Received pick up request:"+pickUpInfo);
+        if (Objects.equals(type, "pickup")) {
             chatService.assignAgent(tenantId, sessionId, userId);
             log.info("Picking up customer: " + pickUpInfo);
-        } else if (type == "drop") {
+        } else if (Objects.equals(type, "drop")) {
             chatService.releaseAgent(tenantId, sessionId);
             log.info("Releasing agent in: "+sessionId);
         }
