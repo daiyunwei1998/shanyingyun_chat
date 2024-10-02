@@ -67,6 +67,24 @@ public class ChatService {
                 sessionInfo.getTenantId());
     }
 
+    // assign agent to customer
+    public void assignAgent(String tenantId, String sessionId, String agentId) {
+        String key = "tenant:" + tenantId + ":session:" + sessionId;
+        SessionInfo sessionInfo = (SessionInfo) redisTemplate.opsForValue().get(key);
+        sessionInfo.setAssignedTo(agentId);
+        redisTemplate.opsForValue().set(key, sessionInfo, Duration.ofHours(1));
+        log.info("Assigned agent {} to session {} under tenant {}", agentId, sessionId, tenantId);
+    }
+
+    // assign agent to customer
+    public void releaseAgent(String tenantId, String sessionId) {
+        String key = "tenant:" + tenantId + ":session:" + sessionId;
+        SessionInfo sessionInfo = (SessionInfo) redisTemplate.opsForValue().get(key);
+        sessionInfo.setAssignedTo(null);
+        redisTemplate.opsForValue().set(key, sessionInfo, Duration.ofHours(1));
+        log.info("Releasing agent of session {} under tenant {}", sessionId, tenantId);
+    }
+
     // Retrieve session information from Redis
     public SessionInfo getSessionInfo(String tenantId, String sessionId) {
         String key = "tenant:" + tenantId + ":session:" + sessionId;
@@ -106,6 +124,19 @@ public class ChatService {
         redisTemplate.delete(key);
         log.info("Deleted session info for session ID {} under tenant {}", sessionId, tenantId);
     }
+
+    // Retrieve session ID by userId and tenantId
+    public String getSessionIdByUserId(String tenantId, String userId) {
+        String key = "tenant:" + tenantId + ":user_session:" + userId;
+        String sessionId = (String) redisTemplate.opsForValue().get(key);
+        if (sessionId != null) {
+            log.info("Retrieved session ID {} for user {} under tenant {}", sessionId, userId, tenantId);
+        } else {
+            log.warn("No session found for user {} under tenant {}", userId, tenantId);
+        }
+        return sessionId;
+    }
+
 
     // ------------------- Agent Management -------------------
 
@@ -232,10 +263,11 @@ public class ChatService {
     // Broadcast customer message to all available agents or AI agent if no agents are available
     public void broadcastMessage(ChatMessage chatMessage) {
         String tenantId = chatMessage.getTenantId();
-        List<String> availableAgents = getAvailableAgents(tenantId);
+        String sessionId = chatMessage.getSessionId();
+        SessionInfo sessionInfo = getSessionInfo(tenantId, sessionId);
 
-        if (availableAgents.isEmpty()) {
-            // No human agents available, forward to AI agent
+        if (sessionInfo.getAssignedTo() == null) {
+            //  forward to AI agent
             forwardMessageToAiAgent(tenantId, chatMessage);
         } else {
             // Broadcast message to all available human agents

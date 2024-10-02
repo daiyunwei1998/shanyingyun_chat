@@ -8,6 +8,6 @@ public class SessionInfo implements Serializable {
     private String sessionId;
     private String userId;
     private String userType; // "customer" or "agent"
-    private String assignedTo; // For customers, the assigned agent ID; for agents, list of customer IDs
+    private String assignedTo; // For customers, the assigned agent ID; for agents, list of customer IDs; null will be handle by AI
     private String tenantId; // Add tenantId to session info
 }

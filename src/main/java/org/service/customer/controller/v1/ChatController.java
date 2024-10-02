@@ -1,6 +1,7 @@
 package org.service.customer.controller.v1;
 
 import lombok.extern.slf4j.Slf4j;
+import org.service.customer.dto.chat.PickUpInfo;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.service.ChatService;
@@ -124,4 +125,21 @@ public class ChatController {
         // Save the message
         chatService.saveMessage(chatMessage);
     }
+
+    @MessageMapping("/chat.pickUp")
+    public void handlePickUp(@Payload PickUpInfo pickUpInfo) {
+        String tenantId = pickUpInfo.getTenant_id();
+        String userId = pickUpInfo.getCustomer();
+        String type = pickUpInfo.getType();
+        String sessionId = chatService.getSessionIdByUserId(tenantId, userId);
+        if (type == "pickup") {
+            chatService.assignAgent(tenantId, sessionId, userId);
+            log.info("Picking up customer: " + pickUpInfo);
+        } else if (type == "drop") {
+            chatService.releaseAgent(tenantId, sessionId);
+            log.info("Releasing agent in: "+sessionId);
+        }
+
+    }
+
 }
