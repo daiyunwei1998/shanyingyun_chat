@@ -100,11 +100,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow all localhost subdomains
+        // Allow all subdomains
         configuration.addAllowedOriginPattern("http://*.localhost:3000");
         configuration.addAllowedOriginPattern("https://*.localhost:3000");
         configuration.addAllowedOriginPattern("http://*.localhost.com:3000");
-
+        configuration.addAllowedOriginPattern("http://*.flashresponse.net");
+        configuration.addAllowedOriginPattern("https://*.flashresponse.net");
 
         // Also allow the main domain without subdomain
         configuration.addAllowedOrigin("http://localhost:3000");
@@ -113,8 +114,8 @@ public class SecurityConfig {
         configuration.addAllowedOriginPattern("http://localhost.com:3000");
         configuration.addAllowedOriginPattern("http://203.204.185.67:3000");
         configuration.addAllowedOriginPattern("http://203.204.185.67:3001");
-        configuration.addAllowedOriginPattern("http://www.yunweidai.net:3000");
-        configuration.addAllowedOriginPattern("http://www.yunweidai.net:3001");
+        configuration.addAllowedOrigin("https://www.flashresponse.net");
+        configuration.addAllowedOrigin("https://flashresponse.net");
 
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
