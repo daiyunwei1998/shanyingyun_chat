@@ -15,6 +15,8 @@ public class ChatMessage implements Serializable {
     private MessageType type;
     private String content;
     private String sender;
+    @JsonProperty("sender_name")
+    private String senderName;
     private String receiver;
     @JsonProperty("tenant_id")
     private String tenantId;
