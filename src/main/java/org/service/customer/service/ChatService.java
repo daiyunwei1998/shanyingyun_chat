@@ -82,7 +82,7 @@ public class ChatService {
         SessionInfo sessionInfo = (SessionInfo) redisTemplate.opsForValue().get(key);
         sessionInfo.setAssignedTo(null);
         redisTemplate.opsForValue().set(key, sessionInfo, Duration.ofHours(1));
-        log.info("Releasing agent of session {} under tenant {}", sessionId, tenantId);
+        log.info("Releasing agent from session {}", sessionInfo);
     }
 
     // Retrieve session information from Redis
