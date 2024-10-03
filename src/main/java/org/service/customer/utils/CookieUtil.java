@@ -10,7 +10,7 @@ public class CookieUtil {
     public static void addJwtToCookie(String jwt, HttpServletResponse response) {
         ResponseCookie jwtCookie = ResponseCookie.from("jwt", jwt)
                 .httpOnly(true)
-                //.domain("yunweidai.net")
+                .domain("flashresponse.net")
                // .secure(true)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
@@ -25,7 +25,7 @@ public class CookieUtil {
     public static void addTenantIdToCookie(String tenantId, HttpServletResponse response) {
         ResponseCookie tenantCookie = ResponseCookie.from("tenantId", tenantId)
                 .httpOnly(true)
-                //.domain("yunweidai.net")
+                .domain("flashresponse.net")
                 // .secure(true)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
@@ -41,6 +41,7 @@ public class CookieUtil {
         ResponseCookie tenantCookie = ResponseCookie.from(key, value)
                 .httpOnly(true)
                 .path("/")
+                .domain("flashresponse.net")
                 .maxAge(7 * 24 * 60 * 60) // 7 days in seconds
                 .build();
 
@@ -53,7 +54,7 @@ public class CookieUtil {
         Cookie cookie = new Cookie(key, "");
         cookie.setPath("/");
         cookie.setMaxAge(0);
-        //cookie.setDomain("yunweidai.net");
+        cookie.setDomain("flashresponse.net");
         response.addCookie(cookie);
     }
 
