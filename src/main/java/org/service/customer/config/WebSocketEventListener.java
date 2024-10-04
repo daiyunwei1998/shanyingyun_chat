@@ -22,11 +22,7 @@ public class WebSocketEventListener {
     @EventListener
     public void handleSessionDisconnect(SessionDisconnectEvent event) {
         String sessionId = event.getSessionId();
-        // We need to find the tenantId associated with this session
-        // Since we don't have the Principal here, we need to search all tenants
-        // Alternatively, store a mapping of sessionId to tenantId when the session is created
 
-        // For simplicity, let's assume we have a method to get tenantId by sessionId
         String tenantId = chatService.getTenantIdBySessionId(sessionId);
         if (tenantId == null) {
             log.warn("No tenantId found for disconnected session ID {}", sessionId);
@@ -49,6 +45,13 @@ public class WebSocketEventListener {
 
             // Additional cleanup if needed (e.g., reassign customers, remove agents from available list)
             if ("agent".equals(userType)) {
+                // Remove agent from available list
+                chatService.removeAgentFromAvailableList(tenantId, userId);
+                return;
+            }
+
+            // remove customer from active list
+            if ("customer".equals(userType)) {
                 // Remove agent from available list
                 chatService.removeAgentFromAvailableList(tenantId, userId);
                 return;

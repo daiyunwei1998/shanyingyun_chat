@@ -2,6 +2,7 @@ package org.service.customer.controller.v1;
 
 import lombok.extern.slf4j.Slf4j;
 import org.service.customer.dto.chat.PickUpInfo;
+import org.service.customer.dto.user.UserInfo;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.service.ChatService;
@@ -38,13 +39,13 @@ public class ChatController {
         String tenantId = chatMessage.getTenantId();
         String userId = chatMessage.getSender();
         String userType = chatMessage.getUserType();
+        String userName = chatMessage.getSenderName();
 
         if (tenantId == null || userId == null || userType == null) {
             log.error("Missing user information in chat message");
             return;
         }
 
-        // TODO delte this temporal solution
         Queue newCustomerQueue = new Queue(tenantId + ".new_customer", true);
         rabbitAdmin.declareQueue(newCustomerQueue);
 
@@ -55,8 +56,6 @@ public class ChatController {
                 .with(tenantId + ".new_customer");
         rabbitAdmin.declareBinding(newCustomerBinding);
 
-
-
         chatMessage.setSessionId(headerAccessor.getSessionId());
 
         // Create and save SessionInfo
@@ -65,6 +64,7 @@ public class ChatController {
         sessionInfo.setUserId(userId);
         sessionInfo.setUserType(userType);
         sessionInfo.setTenantId(tenantId);
+        sessionInfo.setUserName(userName);
 
         chatService.saveSessionInfo(sessionInfo);
         chatService.saveUserSessionMapping(tenantId, userId, chatMessage.getSessionId());
@@ -88,6 +88,9 @@ public class ChatController {
             chatService.notifyNewCustomerSession(tenantId, chatMessage);
             log.info("Broadcasted customer join message to /topic/{}.new_customer", tenantId);
         }
+
+        // Append to active customer list
+        chatService.addUserToActiveList(tenantId, new UserInfo(userId, userName));
     }
 
     @MessageMapping("/chat.sendMessage")
