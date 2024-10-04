@@ -85,12 +85,12 @@ public class ChatController {
 
         // Send a notification to all agents that a customer has joined
         if ("customer".equals(userType)) {
-            chatService.notifyNewCustomerSession(tenantId, chatMessage);
-            log.info("Broadcasted customer join message to /topic/{}.new_customer", tenantId);
+            // Append to active customer list
+            chatService.addUserToActiveList(tenantId, new UserInfo(userId, userName));
+            log.info("Customer {} is now active under tenant {}", userId, tenantId);
         }
 
-        // Append to active customer list
-        chatService.addUserToActiveList(tenantId, new UserInfo(userId, userName));
+
     }
 
     @MessageMapping("/chat.sendMessage")

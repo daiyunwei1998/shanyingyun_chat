@@ -1,6 +1,7 @@
 package org.service.customer.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.service.customer.dto.user.UserInfo;
 import org.service.customer.models.SessionInfo;
 import org.service.customer.service.ChatService;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -53,7 +54,7 @@ public class WebSocketEventListener {
             // remove customer from active list
             if ("customer".equals(userType)) {
                 // Remove agent from available list
-                chatService.removeAgentFromAvailableList(tenantId, userId);
+                chatService.removeUserFromActiveList(tenantId, new UserInfo(userId, sessionInfo.getUserName()));
                 return;
             }
 
