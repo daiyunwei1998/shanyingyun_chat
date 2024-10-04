@@ -1,5 +1,6 @@
 package org.service.customer.dto.chat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.time.Instant;
 
@@ -8,7 +9,8 @@ public class PickUpInfo {
     private String agent;
     private String customer;
     private String type;
-    private String tenant_id;
+    @JsonProperty("tenant_id")
+    private String tenantId;
     private Instant timestamp;
 }
 

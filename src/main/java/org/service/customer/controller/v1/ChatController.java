@@ -132,13 +132,20 @@ public class ChatController {
 
     @MessageMapping("/chat.pickUp")
     public void handlePickUp(@Payload PickUpInfo pickUpInfo) {
-        String tenantId = pickUpInfo.getTenant_id();
+        String tenantId = pickUpInfo.getTenantId();
         String userId = pickUpInfo.getCustomer();
         String type = pickUpInfo.getType();
         String sessionId = chatService.getSessionIdByUserId(tenantId, userId);
         log.info("Received pick up request:"+pickUpInfo);
         if (Objects.equals(type, "pickup")) {
             chatService.assignAgent(tenantId, sessionId, userId);
+            ChatMessage requestMessage = ChatMessage.builder()
+                            .tenantId(pickUpInfo.getTenantId())
+                            .type(ChatMessage.MessageType.SUMMARY)
+                            .sender(pickUpInfo.getAgent())
+                            .receiver(pickUpInfo.getCustomer())
+                            .build();
+            chatService.forwardMessageToAiAgent(tenantId, requestMessage);
             log.info("Picking up customer: " + pickUpInfo);
         } else if (Objects.equals(type, "drop")) {
             chatService.releaseAgent(tenantId, sessionId);
