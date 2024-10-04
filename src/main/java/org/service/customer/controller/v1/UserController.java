@@ -8,8 +8,10 @@ import org.service.customer.dto.api.ResponseDto;
 import org.service.customer.dto.user.LoginRequest;
 import org.service.customer.dto.user.RegisterRequest;
 import org.service.customer.dto.user.UpdateUserRequest;
+import org.service.customer.dto.user.UserInfo;
 import org.service.customer.models.CustomUserDetails;
 import org.service.customer.models.User;
+import org.service.customer.service.ChatService;
 import org.service.customer.service.UserService;
 import org.service.customer.utils.CookieUtil;
 import org.service.customer.utils.JwtTokenProvider;
@@ -36,6 +38,8 @@ public class UserController {
 
     @Autowired
     private AuthenticationManager authenticationManager;
+    @Autowired
+    private ChatService chatService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@PathVariable("tenantId") String tenantId, @Valid @RequestBody RegisterRequest registerRequest, HttpServletResponse response) {
@@ -155,5 +159,11 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(new ResponseDto("Delete failed: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<?> getActiveUsers(@PathVariable("tenantId") String tenantId) {
+        List<UserInfo> users = chatService.getActiveUsers(tenantId);
+        return new ResponseEntity<>(new ResponseDto<>(users), HttpStatus.OK);
     }
 }
