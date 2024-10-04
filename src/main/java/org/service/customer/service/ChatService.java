@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
+import org.service.customer.dto.user.UserInfo;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.springframework.amqp.core.Binding;
@@ -135,6 +136,40 @@ public class ChatService {
             log.warn("No session found for user {} under tenant {}", userId, tenantId);
         }
         return sessionId;
+    }
+
+    // Save customer to active list
+    public void addUserToActiveList(String tenantId, UserInfo userInfo) {
+        String key = "tenant:" + tenantId + ":active_customers";
+        redisTemplate.opsForList().rightPush(key, userInfo);
+
+        log.info("Added user to active list: tenant={}, user={}", tenantId, userInfo.getUserId());
+    }
+
+    // Get the list of users
+    @SuppressWarnings("unchecked")
+    public List<UserInfo> getActiveUsers(String tenantId) {
+        String key = "tenant:" + tenantId + ":active_customers";
+
+        // Retrieve the list from Redis and cast it to List<UserInfo>
+        List<Object> rawList = redisTemplate.opsForList().range(key, 0, -1);
+
+        // Cast the list to List<UserInfo>
+        List<UserInfo> activeUsers = (List<UserInfo>) (List<?>) rawList;
+
+        log.info("Retrieved active user list: tenant={}", tenantId);
+
+        return activeUsers;
+    }
+
+    // Remove a specific user from the list
+    public void removeUserFromActiveList(String tenantId, UserInfo userInfo) {
+        String key = "tenant:" + tenantId + ":active_customers";
+
+        // This will remove one instance of the userInfo object from the list
+        redisTemplate.opsForList().remove(key, 1, userInfo);
+
+        log.info("Removed user from active list: tenant={}, user={}", tenantId, userInfo.getUserId());
     }
 
 
