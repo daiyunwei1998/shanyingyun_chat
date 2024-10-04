@@ -279,7 +279,7 @@ public class ChatService {
 
     // Save message to Redis
     private void saveMessageToRedis(ChatMessage chatMessage) {
-        String key = "tenant:" + chatMessage.getTenantId() + ":chat:customer_messages:" + chatMessage.getCustomerId();
+        String key = "tenant:" + chatMessage.getTenantId() + ":chat:customer_messages:" + chatMessage.getSessionId();
         redisTemplate.opsForList().rightPush(key, chatMessage);
         log.info("Saved message to Redis under key: {}", key);
     }
@@ -374,11 +374,6 @@ public class ChatService {
         if (agentId != null) {
             log.info("Removed agent {} from session {}", agentId, sessionId);
         }
-    }
-
-    // hand over session to agent
-    public void handoverSessionToAgent(String sessionId, String agentId) {
-        // TODO
     }
 
     // ------------------- Handling Responses -------------------
