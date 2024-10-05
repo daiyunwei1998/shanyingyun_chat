@@ -296,7 +296,7 @@ public class ChatService {
     public List<ChatMessage> loadMessageHistoryFromRedis(String tenantId, String customerId) {
         String sessionId = getSessionIdByUserId(tenantId, customerId);
         String key = "tenant:" + tenantId + ":chat:customer_messages:" + sessionId;
-
+        log.info("Loading message history from Redis for key: {}", key);
         // Retrieve the entire message list from Redis as List<Object>
         List<Object> rawMessageHistory = redisTemplate.opsForList().range(key, 0, -1);  // Get all elements in the list
 
