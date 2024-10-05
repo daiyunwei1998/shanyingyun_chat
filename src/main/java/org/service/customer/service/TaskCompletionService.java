@@ -14,10 +14,6 @@ import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
-
 @Slf4j
 @Service
 public class TaskCompletionService {
@@ -58,6 +54,6 @@ public class TaskCompletionService {
         // Send the message to the WebSocket topic
         messagingTemplate.convertAndSend("/topic/" + tenantId + ".task_complete", message);
     }
-
+    
 }
 

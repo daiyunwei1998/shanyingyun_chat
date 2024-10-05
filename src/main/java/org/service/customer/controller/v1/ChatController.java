@@ -139,13 +139,13 @@ public class ChatController {
         log.info("Received pick up request:"+pickUpInfo);
         if (Objects.equals(type, "pickup")) {
             chatService.assignAgent(tenantId, sessionId, userId);
-            ChatMessage requestMessage = ChatMessage.builder()
-                            .tenantId(pickUpInfo.getTenantId())
-                            .type(ChatMessage.MessageType.SUMMARY)
-                            .sender(pickUpInfo.getAgent())
-                            .receiver(pickUpInfo.getCustomer())
-                            .build();
-            chatService.forwardMessageToAiAgent(tenantId, requestMessage);
+//            ChatMessage requestMessage = ChatMessage.builder()
+//                            .tenantId(pickUpInfo.getTenantId())
+//                            .type(ChatMessage.MessageType.SUMMARY)
+//                            .sender(pickUpInfo.getAgent())
+//                            .receiver(pickUpInfo.getCustomer())
+//                            .build();
+//            chatService.forwardMessageToAiAgent(tenantId, requestMessage);
             log.info("Picking up customer: " + pickUpInfo);
         } else if (Objects.equals(type, "drop")) {
             chatService.releaseAgent(tenantId, sessionId);
