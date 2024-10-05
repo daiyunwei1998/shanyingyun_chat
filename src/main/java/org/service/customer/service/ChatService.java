@@ -292,6 +292,25 @@ public class ChatService {
         log.info("Saved message to MongoDB under collection: {}", collectionName);
     }
 
+    // Load message for specific session
+    public List<ChatMessage> loadMessageHistoryFromRedis(String tenantId, String customerId) {
+        String sessionId = getSessionIdByUserId(tenantId, customerId);
+        String key = "tenant:" + tenantId + ":chat:customer_messages:" + sessionId;
+
+        // Retrieve the entire message list from Redis as List<Object>
+        List<Object> rawMessageHistory = redisTemplate.opsForList().range(key, 0, -1);  // Get all elements in the list
+
+        // Deserialize the list of objects into List<ChatMessage>
+        List<ChatMessage> messageHistory = rawMessageHistory.stream()
+                .map(object -> objectMapper.convertValue(object, ChatMessage.class))
+                .collect(Collectors.toList());
+
+        log.info("Loaded message history from Redis for key: {}", key);
+
+        return messageHistory;  // Return the message history
+    }
+
+
     public void notifyNewCustomerSession(String tenantId, ChatMessage chatMessage) {
         messagingTemplate.convertAndSend("/topic/" + tenantId + ".new_customer", chatMessage);
     }

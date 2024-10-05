@@ -6,6 +6,9 @@ import org.service.customer.models.ChatMessage;
 import org.service.customer.service.ChatService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 
 @Slf4j
 @RestController
@@ -37,10 +40,17 @@ public class ChatRestController {
 
         // Only publish that the customer is waiting
         chatService.publishCustomerWaiting(aiMessage);
-
     }
 
+    @PostMapping("/history")
+    public List<ChatMessage> getHistory(@RequestBody Map<String, Object> requestBody) {
+        // Extract tenantId and sessionId from the request body
+        String tenantId = (String) requestBody.get("tenant_id");
+        String customerId = (String) requestBody.get("customer_id");
 
+        // Call the chatService's getHistory method
+        return chatService.loadMessageHistoryFromRedis(tenantId, customerId);
+    }
 
 
 
