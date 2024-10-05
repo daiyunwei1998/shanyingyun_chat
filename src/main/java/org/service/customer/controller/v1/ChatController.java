@@ -85,6 +85,7 @@ public class ChatController {
 
         // Send a notification to all agents that a customer has joined
         if ("customer".equals(userType)) {
+            chatService.notifyNewCustomerSession(tenantId, chatMessage);
             // Append to active customer list
             chatService.addUserToActiveList(tenantId, new UserInfo(userId, userName));
             log.info("Customer {} is now active under tenant {}", userId, tenantId);
@@ -139,13 +140,6 @@ public class ChatController {
         log.info("Received pick up request:"+pickUpInfo);
         if (Objects.equals(type, "pickup")) {
             chatService.assignAgent(tenantId, sessionId, userId);
-//            ChatMessage requestMessage = ChatMessage.builder()
-//                            .tenantId(pickUpInfo.getTenantId())
-//                            .type(ChatMessage.MessageType.SUMMARY)
-//                            .sender(pickUpInfo.getAgent())
-//                            .receiver(pickUpInfo.getCustomer())
-//                            .build();
-//            chatService.forwardMessageToAiAgent(tenantId, requestMessage);
             log.info("Picking up customer: " + pickUpInfo);
         } else if (Objects.equals(type, "drop")) {
             chatService.releaseAgent(tenantId, sessionId);
