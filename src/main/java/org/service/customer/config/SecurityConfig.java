@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/register").permitAll()  // Public access
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/login").permitAll()
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/logout").permitAll()
+                        .requestMatchers("/api/v1/chats/handover").permitAll()
                         .requestMatchers("/api/v1/admin/login").permitAll()
                         .requestMatchers("/ws/*").permitAll()
                         //.requestMatchers("/api/v1/tenants/{tenantId}/users/**").hasRole("ADMIN")  // Restrict to ADMIN role

@@ -41,7 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return pathMatcher.match("/api/v1/tenants/*/users/login", path) ||
                 pathMatcher.match("/api/v1/tenants/*/users/register", path) ||
                 pathMatcher.match("/api/v1/tenants/*/users/logout", path) ||
-                pathMatcher.match("/api/v1/admin/login", path);
+                pathMatcher.match("/api/v1/admin/login", path) ||
+                pathMatcher.match("/api/v1/chats/handover", path);
     }
 
 
