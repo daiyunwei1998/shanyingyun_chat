@@ -278,6 +278,10 @@ public class ChatService {
         saveMessageToMongo(chatMessage);
     }
 
+    public void deleteRedisKey(String key) {
+        redisTemplate.delete(key);
+    }
+
     // Save message to Redis
     private void saveMessageToRedis(ChatMessage chatMessage) {
         String key = "tenant:" + chatMessage.getTenantId() + ":chat:customer_messages:" + chatMessage.getSessionId();

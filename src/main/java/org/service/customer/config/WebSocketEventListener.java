@@ -44,7 +44,12 @@ public class WebSocketEventListener {
 
             log.info("User {} of type {} has disconnected and session data cleaned up under tenant {}", userId, userType, tenantId);
 
-            // Additional cleanup if needed (e.g., reassign customers, remove agents from available list)
+            // Remove the chat history from Redis
+            String redisKey = "tenant:" + tenantId + ":chat:customer_messages:" + sessionId;
+            chatService.deleteRedisKey(redisKey);
+            log.info("Deleted chat history from Redis with key: {}", redisKey);
+
+
             if ("agent".equals(userType)) {
                 // Remove agent from available list
                 chatService.removeAgentFromAvailableList(tenantId, userId);
