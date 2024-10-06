@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
+import org.service.customer.dto.chat.HandoverEvent;
 import org.service.customer.dto.chat.PickUpInfo;
 import org.service.customer.dto.user.UserInfo;
 import org.service.customer.models.ChatMessage;
@@ -378,13 +379,16 @@ public class ChatService {
 
 
     // notify new customer in waiting queue
-    public void publishCustomerWaiting(ChatMessage chatMessage) {
-        String tenantId = chatMessage.getTenantId();
+    public void publishCustomerWaiting(HandoverEvent event) {
+        String tenantId = event.getTenantId();
         try {
-            String messageBody = convertChatMessageToJson(chatMessage);
-            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_waiting", chatMessage);
+            String eventBody = objectMapper.writeValueAsString(event);
+            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_waiting", event);
             log.info("notify customer waiting to {}", "/topic/" + tenantId + ".customer_waiting");
-    } catch (Exception e) {
+    }   catch (JsonProcessingException e) {
+            log.error("Error converting ChatMessage to JSON: {}", e.getMessage());
+        }
+        catch (Exception e) {
             log.error("Failed to forward message to AI agent: {}", e.getMessage());
         }
     }

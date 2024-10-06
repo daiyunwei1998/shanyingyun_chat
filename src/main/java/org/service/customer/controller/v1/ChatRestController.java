@@ -2,6 +2,7 @@ package org.service.customer.controller.v1;
 
 import lombok.extern.slf4j.Slf4j;
 import org.service.customer.dto.HandoverRequest;
+import org.service.customer.dto.chat.HandoverEvent;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.service.ChatService;
 import org.springframework.web.bind.annotation.*;
@@ -24,22 +25,16 @@ public class ChatRestController {
     @PostMapping("/handover")
     public void handoverToAgent(@RequestBody HandoverRequest handoverRequest) {
         String sessionId = handoverRequest.getSessionId();
-        String chatSummary = handoverRequest.getSummary();
         String customerId = handoverRequest.getCustomerId();
         String tenantId = handoverRequest.getTenantId();
 
-        // Send message to customer_waiting queue
-        ChatMessage aiMessage = new ChatMessage();
-        aiMessage.setSessionId(sessionId);
-        aiMessage.setType(ChatMessage.MessageType.CHAT);
-        aiMessage.setContent(chatSummary);
-        aiMessage.setSender("AI");
-        aiMessage.setCustomerId(customerId);
-        aiMessage.setTenantId(tenantId);
-        aiMessage.setSource(ChatMessage.SourceType.AI);
+        HandoverEvent event = new HandoverEvent();
+        event.setCustomerId(customerId);
+        event.setTenantId(tenantId);
+        event.setSessionId(sessionId);
 
         // Only publish that the customer is waiting
-        chatService.publishCustomerWaiting(aiMessage);
+        chatService.publishCustomerWaiting(event);
     }
 
     @PostMapping("/history")
@@ -51,7 +46,5 @@ public class ChatRestController {
         // Call the chatService's getHistory method
         return chatService.loadMessageHistoryFromRedis(tenantId, customerId);
     }
-
-
 
 }
