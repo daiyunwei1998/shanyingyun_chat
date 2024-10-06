@@ -21,9 +21,10 @@
         </encoder>
     </appender>
 
-    <!-- Root logger with INFO level, logging to the file appender -->
+    <!-- Root logger with INFO level, logging to both file and console -->
     <root level="INFO">
         <appender-ref ref="FILE" />
+        <appender-ref ref="CONSOLE" />
     </root>
 
     <!-- Logger to enable DEBUG level for the console -->

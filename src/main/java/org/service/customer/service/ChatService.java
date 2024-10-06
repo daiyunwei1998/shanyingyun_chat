@@ -305,7 +305,7 @@ public class ChatService {
                 .map(object -> objectMapper.convertValue(object, ChatMessage.class))
                 .collect(Collectors.toList());
 
-        log.info("Loaded message history from Redis for key: {}", key);
+        log.info("Loaded message history from Redis for key: {} \n {}", messageHistory);
 
         return messageHistory;  // Return the message history
     }
