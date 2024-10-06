@@ -5,6 +5,8 @@ import org.service.customer.dto.HandoverRequest;
 import org.service.customer.dto.chat.HandoverEvent;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.service.ChatService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,7 +25,7 @@ public class ChatRestController {
     }
 
     @PostMapping("/handover")
-    public void handoverToAgent(@RequestBody HandoverRequest handoverRequest) {
+    public ResponseEntity<?> handoverToAgent(@RequestBody HandoverRequest handoverRequest) {
         String sessionId = handoverRequest.getSessionId();
         String customerId = handoverRequest.getCustomerId();
         String tenantId = handoverRequest.getTenantId();
@@ -35,6 +37,8 @@ public class ChatRestController {
 
         // Only publish that the customer is waiting
         chatService.publishCustomerWaiting(event);
+
+        return new ResponseEntity<>(HttpStatus.ACCEPTED);
     }
 
     @PostMapping("/history")
