@@ -23,6 +23,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
@@ -55,7 +58,7 @@ public class UserController {
             );
 
             CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-            String name = userDetails.getUser().getName();
+            String name = URLEncoder.encode(userDetails.getUser().getName(), StandardCharsets.UTF_8.toString());
             CookieUtil.setCookie("userName",name,response);
             Long id = userDetails.getUser().getId();
             CookieUtil.setCookie("userId",Long.toString(id),response);
@@ -74,13 +77,15 @@ public class UserController {
             //return new ResponseEntity<>(new ResponseDto("User registered successfully for tenant " + tenantId), HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(new ResponseDto("Invalid input: " + e.getMessage()), HttpStatus.BAD_REQUEST);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest,
                                    @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId,
-                                   HttpServletResponse response) {
+                                   HttpServletResponse response) throws UnsupportedEncodingException {
         // authenticate the user
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -89,7 +94,7 @@ public class UserController {
         );
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        String name = userDetails.getUser().getName();
+        String name = URLEncoder.encode(userDetails.getUser().getName(), StandardCharsets.UTF_8.toString());
         CookieUtil.setCookie("userName",name,response);
         Long id = userDetails.getUser().getId();
         CookieUtil.setCookie("userId",Long.toString(id),response);
