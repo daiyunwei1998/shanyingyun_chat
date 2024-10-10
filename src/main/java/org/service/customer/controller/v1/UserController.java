@@ -76,9 +76,9 @@ public class UserController {
 
             //return new ResponseEntity<>(new ResponseDto("User registered successfully for tenant " + tenantId), HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(new ResponseDto("Invalid input: " + e.getMessage()), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ErrorDto("Invalid input: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         } catch (UnsupportedEncodingException e) {
-            return new ResponseEntity<>(new ResponseDto("Sign up failed: " + e.getMessage()), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ErrorDto("Sign up failed: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         }
     }
 
