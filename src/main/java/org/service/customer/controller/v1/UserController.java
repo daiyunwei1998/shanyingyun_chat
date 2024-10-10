@@ -78,7 +78,7 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(new ResponseDto("Invalid input: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
+            return new ResponseEntity<>(new ResponseDto("Sign up failed: " + e.getMessage()), HttpStatus.BAD_REQUEST);
         }
     }
 
