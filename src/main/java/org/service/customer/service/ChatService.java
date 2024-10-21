@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
+import org.service.customer.dto.chat.HandoverEvent;
+import org.service.customer.dto.chat.PickUpInfo;
+import org.service.customer.dto.user.UserInfo;
 import org.service.customer.models.ChatMessage;
 import org.service.customer.models.SessionInfo;
 import org.springframework.amqp.core.Binding;
@@ -67,6 +70,24 @@ public class ChatService {
                 sessionInfo.getTenantId());
     }
 
+    // assign agent to customer
+    public void assignAgent(String tenantId, String sessionId, String agentId) {
+        String key = "tenant:" + tenantId + ":session:" + sessionId;
+        SessionInfo sessionInfo = (SessionInfo) redisTemplate.opsForValue().get(key);
+        sessionInfo.setAssignedTo(agentId);
+        redisTemplate.opsForValue().set(key, sessionInfo, Duration.ofHours(1));
+        log.info("Assigned agent {} to session {} under tenant {}", agentId, sessionId, tenantId);
+    }
+
+    // assign agent to customer
+    public void releaseAgent(String tenantId, String sessionId) {
+        String key = "tenant:" + tenantId + ":session:" + sessionId;
+        SessionInfo sessionInfo = (SessionInfo) redisTemplate.opsForValue().get(key);
+        sessionInfo.setAssignedTo(null);
+        redisTemplate.opsForValue().set(key, sessionInfo, Duration.ofHours(1));
+        log.info("Releasing agent from session {}", sessionInfo);
+    }
+
     // Retrieve session information from Redis
     public SessionInfo getSessionInfo(String tenantId, String sessionId) {
         String key = "tenant:" + tenantId + ":session:" + sessionId;
@@ -106,6 +127,53 @@ public class ChatService {
         redisTemplate.delete(key);
         log.info("Deleted session info for session ID {} under tenant {}", sessionId, tenantId);
     }
+
+    // Retrieve session ID by userId and tenantId
+    public String getSessionIdByUserId(String tenantId, String userId) {
+        String key = "tenant:" + tenantId + ":user_session:" + userId;
+        String sessionId = (String) redisTemplate.opsForValue().get(key);
+        if (sessionId != null) {
+            log.info("Retrieved session ID {} for user {} under tenant {}", sessionId, userId, tenantId);
+        } else {
+            log.warn("No session found for user {} under tenant {}", userId, tenantId);
+        }
+        return sessionId;
+    }
+
+    // Save customer to active list
+    public void addUserToActiveList(String tenantId, UserInfo userInfo) {
+        String key = "tenant:" + tenantId + ":active_customers";
+        redisTemplate.opsForList().rightPush(key, userInfo);
+
+        log.info("Added user to active list: tenant={}, user={}", tenantId, userInfo.getUserId());
+    }
+
+    // Get the list of users
+    @SuppressWarnings("unchecked")
+    public List<UserInfo> getActiveUsers(String tenantId) {
+        String key = "tenant:" + tenantId + ":active_customers";
+
+        // Retrieve the list from Redis and cast it to List<UserInfo>
+        List<Object> rawList = redisTemplate.opsForList().range(key, 0, -1);
+
+        // Cast the list to List<UserInfo>
+        List<UserInfo> activeUsers = (List<UserInfo>) (List<?>) rawList;
+
+        log.info("Retrieved active user list: tenant={}", tenantId);
+
+        return activeUsers;
+    }
+
+    // Remove a specific user from the list
+    public void removeUserFromActiveList(String tenantId, UserInfo userInfo) {
+        String key = "tenant:" + tenantId + ":active_customers";
+
+        // This will remove one instance of the userInfo object from the list
+        redisTemplate.opsForList().remove(key, 1, userInfo);
+
+        log.info("Removed user from active list: tenant={}, user={}", tenantId, userInfo.getUserId());
+    }
+
 
     // ------------------- Agent Management -------------------
 
@@ -211,9 +279,13 @@ public class ChatService {
         saveMessageToMongo(chatMessage);
     }
 
+    public void deleteRedisKey(String key) {
+        redisTemplate.delete(key);
+    }
+
     // Save message to Redis
     private void saveMessageToRedis(ChatMessage chatMessage) {
-        String key = "tenant:" + chatMessage.getTenantId() + ":chat:customer_messages:" + chatMessage.getCustomerId();
+        String key = "tenant:" + chatMessage.getTenantId() + ":chat:customer_messages:" + chatMessage.getSessionId();
         redisTemplate.opsForList().rightPush(key, chatMessage);
         log.info("Saved message to Redis under key: {}", key);
     }
@@ -225,6 +297,25 @@ public class ChatService {
         log.info("Saved message to MongoDB under collection: {}", collectionName);
     }
 
+    // Load message for specific session
+    public List<ChatMessage> loadMessageHistoryFromRedis(String tenantId, String customerId) {
+        String sessionId = getSessionIdByUserId(tenantId, customerId);
+        String key = "tenant:" + tenantId + ":chat:customer_messages:" + sessionId;
+        log.info("Loading message history from Redis for key: {}", key);
+        // Retrieve the entire message list from Redis as List<Object>
+        List<Object> rawMessageHistory = redisTemplate.opsForList().range(key, 0, -1);  // Get all elements in the list
+
+        // Deserialize the list of objects into List<ChatMessage>
+        List<ChatMessage> messageHistory = rawMessageHistory.stream()
+                .map(object -> objectMapper.convertValue(object, ChatMessage.class))
+                .collect(Collectors.toList());
+
+        log.info("Loaded message history from Redis for key: {} \n {}", messageHistory);
+
+        return messageHistory;  // Return the message history
+    }
+
+
     public void notifyNewCustomerSession(String tenantId, ChatMessage chatMessage) {
         messagingTemplate.convertAndSend("/topic/" + tenantId + ".new_customer", chatMessage);
     }
@@ -232,10 +323,11 @@ public class ChatService {
     // Broadcast customer message to all available agents or AI agent if no agents are available
     public void broadcastMessage(ChatMessage chatMessage) {
         String tenantId = chatMessage.getTenantId();
-        List<String> availableAgents = getAvailableAgents(tenantId);
+        String sessionId = chatMessage.getSessionId();
+        SessionInfo sessionInfo = getSessionInfo(tenantId, sessionId);
 
-        if (availableAgents.isEmpty()) {
-            // No human agents available, forward to AI agent
+        if (sessionInfo.getAssignedTo() == null) {
+            //  forward to AI agent
             forwardMessageToAiAgent(tenantId, chatMessage);
         } else {
             // Broadcast message to all available human agents
@@ -262,6 +354,15 @@ public class ChatService {
         }
     }
 
+    private String convertPickUpInfoToJson(PickUpInfo pickUpInfo) {
+        try {
+            return objectMapper.writeValueAsString(pickUpInfo);
+        } catch (JsonProcessingException e) {
+            log.error("Error converting pickUpInfo to JSON: {}", e.getMessage());
+            return "{}";
+        }
+    }
+
     // Forward the message to an AI agent if no human agent is available
     public void forwardMessageToAiAgent(String tenantId, ChatMessage chatMessage) {
         log.info("Forwarding message from {} to AI agent for tenant {}", chatMessage.getSender(), chatMessage.getTenantId());
@@ -276,14 +377,18 @@ public class ChatService {
         }
     }
 
+
     // notify new customer in waiting queue
-    public void publishCustomerWaiting(ChatMessage chatMessage) {
-        String tenantId = chatMessage.getTenantId();
+    public void publishCustomerWaiting(HandoverEvent event) {
+        String tenantId = event.getTenantId();
         try {
-            String messageBody = convertChatMessageToJson(chatMessage);
-            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_waiting", chatMessage);
+            String eventBody = objectMapper.writeValueAsString(event);
+            messagingTemplate.convertAndSend("/topic/" + tenantId + ".customer_waiting", event);
             log.info("notify customer waiting to {}", "/topic/" + tenantId + ".customer_waiting");
-    } catch (Exception e) {
+    }   catch (JsonProcessingException e) {
+            log.error("Error converting ChatMessage to JSON: {}", e.getMessage());
+        }
+        catch (Exception e) {
             log.error("Failed to forward message to AI agent: {}", e.getMessage());
         }
     }
@@ -307,11 +412,6 @@ public class ChatService {
         if (agentId != null) {
             log.info("Removed agent {} from session {}", agentId, sessionId);
         }
-    }
-
-    // hand over session to agent
-    public void handoverSessionToAgent(String sessionId, String agentId) {
-        // TODO
     }
 
     // ------------------- Handling Responses -------------------

@@ -1,74 +1,59 @@
-name: Build and Deploy Spring Boot App
-
+name: Deploy to EC2
 on:
   push:
     branches:
       - dev
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'  # Install Eclipse Temurin JDK
-        java-version: '17'
-
-    - name: Cache Maven packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-
-
-    - name: Build with Maven
-      run: mvn clean install -DskipTests
-
-    - name: Upload JAR Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: spring-boot-app
-        path: target/*.jar
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
-
     steps:
-    - name: Download JAR Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: spring-boot-app
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    # Use appleboy/ssh-action to handle SSH-related tasks
-    - name: Deploy to Server via SSH
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        password: ${{ secrets.PASSWORD }}
-        port: ${{ secrets.PORT }}
-        script: |
-          # Ensure the logs folder exists
-          mkdir -p $DEPLOY_PATH/logs;
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-          # Move the jar file to the deploy path
-          mv target/*.jar $DEPLOY_PATH/app.jar;
+      - name: Build with Maven
+        run: |
+          mkdir -p ~/.ssh
+          mvn clean package -DskipTests
 
-          # Stop the platform service
-          sudo systemctl stop platform.service;
+      - name: Create service file
+        run: |
+          cat << EOF > customer-service.service
+          [Unit]
+          Description=Customer Service
+          After=network.target
 
-          # Redirect logs to the logs folder
-          sudo sed -i '/ExecStart/ c\\ExecStart=/usr/bin/java -jar $DEPLOY_PATH/app.jar >> $DEPLOY_PATH/logs/app.log 2>&1' /etc/systemd/system/platform.service;
+          [Service]
+          User=matcha
+          ExecStart=/usr/bin/java -jar /home/matcha/customer-0.0.1-SNAPSHOT.jar
+          EnvironmentFile=/etc/environment
+          Restart=always
 
-          # Reload the systemd configuration to apply changes
-          sudo systemctl daemon-reload;
+          [Install]
+          WantedBy=multi-user.target
+          EOF
 
-          # Start the platform service
-          sudo systemctl start platform.service;
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          scp -o StrictHostKeyChecking=no -i private_key.pem target/customer-0.0.1-SNAPSHOT.jar matcha@${{ secrets.SSH_HOST }}:~
+          scp -o StrictHostKeyChecking=no -i private_key.pem customer-service.service matcha@${{ secrets.SSH_HOST }}:~
+          ssh -o StrictHostKeyChecking=no -i private_key.pem matcha@${{ secrets.SSH_HOST }} << 'EOF'
+            set -x
+            sudo mv ~/customer-service.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl restart customer-service
+            sudo systemctl enable customer-service
+            sudo systemctl status customer-service
+            journalctl -u customer-service -n 20 --no-pager
+          EOF

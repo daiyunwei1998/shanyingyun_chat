@@ -7,8 +7,6 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.service.customer.models.ChatMessage;
-import org.service.customer.models.SessionInfo;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -29,6 +27,7 @@ public class RedisConfig {
         objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType("org.service.customer.models")
+                .allowIfSubType("org.service.customer.dto.user")
                 .build();
         objectMapper.activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
 

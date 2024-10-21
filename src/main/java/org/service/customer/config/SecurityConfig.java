@@ -50,9 +50,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/register").permitAll()  // Public access
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/login").permitAll()
                         .requestMatchers("/api/v1/tenants/{tenantId}/users/logout").permitAll()
+                        .requestMatchers("/api/v1/chats/handover").permitAll()
                         .requestMatchers("/api/v1/admin/login").permitAll()
                         .requestMatchers("/ws/*").permitAll()
-                        //.requestMatchers("/api/v1/tenants/{tenantId}/users/**").hasRole("ADMIN")  // Restrict to ADMIN role
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -100,11 +101,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow all localhost subdomains
+        // Allow all subdomains
         configuration.addAllowedOriginPattern("http://*.localhost:3000");
         configuration.addAllowedOriginPattern("https://*.localhost:3000");
         configuration.addAllowedOriginPattern("http://*.localhost.com:3000");
-
+        configuration.addAllowedOriginPattern("http://*.flashresponse.net");
+        configuration.addAllowedOriginPattern("https://*.flashresponse.net");
 
         // Also allow the main domain without subdomain
         configuration.addAllowedOrigin("http://localhost:3000");
@@ -113,8 +115,8 @@ public class SecurityConfig {
         configuration.addAllowedOriginPattern("http://localhost.com:3000");
         configuration.addAllowedOriginPattern("http://203.204.185.67:3000");
         configuration.addAllowedOriginPattern("http://203.204.185.67:3001");
-        configuration.addAllowedOriginPattern("http://www.yunweidai.net:3000");
-        configuration.addAllowedOriginPattern("http://www.yunweidai.net:3001");
+        configuration.addAllowedOrigin("https://www.flashresponse.net");
+        configuration.addAllowedOrigin("https://flashresponse.net");
 
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.service.customer.dto.TaskCompletionMessage;
-import org.service.customer.models.TaskCompletionEvent;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
@@ -14,10 +13,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -42,12 +37,8 @@ public class TaskCompletionService {
             return;
         }
 
-        log.info("Received task completion message for tenant: {}", message.getTenantId());
         String tenantId = message.getTenantId();
-        String file =  message.getFile();
-
-        TaskCompletionEvent taskCompletionEvent = new TaskCompletionEvent(tenantId, file);
-
+        log.info("Received task completion message for tenant: {}", message);
 
         // Notify the frontend via WebSocket
         String queueName = tenantId + ".task_complete";
@@ -61,8 +52,8 @@ public class TaskCompletionService {
         rabbitAdmin.declareBinding(binding);
 
         // Send the message to the WebSocket topic
-        messagingTemplate.convertAndSend("/topic/" + tenantId + ".task_complete", taskCompletionEvent);
+        messagingTemplate.convertAndSend("/topic/" + tenantId + ".task_complete", message);
     }
-
+    
 }
 
